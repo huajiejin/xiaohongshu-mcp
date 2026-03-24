@@ -288,8 +288,92 @@ func (s *AppServer) myProfileHandler(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "GET_MY_PROFILE_FAILED",
 			"获取我的主页失败", err.Error())
 		return
-	}
+	 }
 
 	c.Set("account", "ai-report")
-	respondSuccess(c, map[string]any{"data": result}, "获取我的主页成功")
+    respondSuccess(c, map[string]any{"data": result}, "获取我的主页成功")
+}
+
+// likeFeedHandler 点赞笔记
+func (s *AppServer) likeFeedHandler(c *gin.Context) {
+    var req LikeFavoriteRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        respondError(c, http.StatusBadRequest, "INVALID_REQUEST",
+            "请求参数错误", err.Error())
+        return
+    }
+
+    // 执行点赞
+    result, err := s.xiaohongshuService.LikeFeed(c.Request.Context(), req.FeedID, req.XsecToken)
+    if err != nil {
+        respondError(c, http.StatusInternalServerError, "LIKE_FEED_FAILED",
+            "点赞失败", err.Error())
+        return
+    }
+
+    c.Set("account", "ai-report")
+    respondSuccess(c, result, result.Message)
+}
+
+// unlikeFeedHandler 取消点赞笔记
+func (s *AppServer) unlikeFeedHandler(c *gin.Context) {
+    var req LikeFavoriteRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        respondError(c, http.StatusBadRequest, "INVALID_REQUEST",
+            "请求参数错误", err.Error())
+        return
+    }
+
+    // 执行取消点赞
+    result, err := s.xiaohongshuService.UnlikeFeed(c.Request.Context(), req.FeedID, req.XsecToken)
+    if err != nil {
+        respondError(c, http.StatusInternalServerError, "UNLIKE_FEED_FAILED",
+            "取消点赞失败", err.Error())
+        return
+    }
+
+    c.Set("account", "ai-report")
+    respondSuccess(c, result, result.Message)
+}
+
+// favoriteFeedHandler 收藏笔记
+func (s *AppServer) favoriteFeedHandler(c *gin.Context) {
+    var req LikeFavoriteRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        respondError(c, http.StatusBadRequest, "INVALID_REQUEST",
+            "请求参数错误", err.Error())
+        return
+    }
+
+    // 执行收藏
+    result, err := s.xiaohongshuService.FavoriteFeed(c.Request.Context(), req.FeedID, req.XsecToken)
+    if err != nil {
+        respondError(c, http.StatusInternalServerError, "FAVORITE_FEED_FAILED",
+            "收藏失败", err.Error())
+        return
+    }
+
+    c.Set("account", "ai-report")
+    respondSuccess(c, result, result.Message)
+}
+
+// unfavoriteFeedHandler 取消收藏笔记
+func (s *AppServer) unfavoriteFeedHandler(c *gin.Context) {
+    var req LikeFavoriteRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        respondError(c, http.StatusBadRequest, "INVALID_REQUEST",
+            "请求参数错误", err.Error())
+        return
+    }
+
+    // 执行取消收藏
+    result, err := s.xiaohongshuService.UnfavoriteFeed(c.Request.Context(), req.FeedID, req.XsecToken)
+    if err != nil {
+        respondError(c, http.StatusInternalServerError, "UNFAVORITE_FEED_FAILED",
+            "取消收藏失败", err.Error())
+        return
+    }
+
+    c.Set("account", "ai-report")
+    respondSuccess(c, result, result.Message)
 }
