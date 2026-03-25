@@ -43,6 +43,10 @@
 | GET | `/api/v1/feeds/list` | 获取 Feeds 列表 |
 | GET/POST | `/api/v1/feeds/search` | 搜索 Feeds |
 | POST | `/api/v1/feeds/detail` | 获取 Feed 详情 |
+| POST | `/api/v1/feeds/like` | 点赞 Feed |
+| POST | `/api/v1/feeds/unlike` | 取消点赞 Feed |
+| POST | `/api/v1/feeds/favorite` | 收藏 Feed |
+| POST | `/api/v1/feeds/unfavorite` | 取消收藏 Feed |
 | POST | `/api/v1/user/profile` | 获取用户主页信息 |
 | GET | `/api/v1/user/me` | 获取当前登录用户信息 |
 | POST | `/api/v1/feeds/comment` | 发表评论 |
@@ -549,6 +553,76 @@ Content-Type: application/json
 - `comments.hasMore`: 是否有更多评论
 ```
 
+#### 4.4 点赞/取消点赞
+
+对指定 Feed 进行点赞或取消点赞操作。
+
+**请求**
+```
+POST /api/v1/feeds/like
+POST /api/v1/feeds/unlike
+Content-Type: application/json
+```
+
+**请求体**
+```json
+{
+  "feed_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+  "xsec_token": "security_token_here"
+}
+```
+
+**请求参数说明:**
+- `feed_id` (string, required): Feed ID
+- `xsec_token` (string, required): 安全令牌
+
+**响应**
+```json
+{
+  "success": true,
+  "data": {
+    "feed_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+    "success": true
+  },
+  "message": "操作成功"
+}
+```
+
+#### 4.5 收藏/取消收藏
+
+对指定 Feed 进行收藏或取消收藏操作。
+
+**请求**
+```
+POST /api/v1/feeds/favorite
+POST /api/v1/feeds/unfavorite
+Content-Type: application/json
+```
+
+**请求体**
+```json
+{
+  "feed_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+  "xsec_token": "security_token_here"
+}
+```
+
+**请求参数说明:**
+- `feed_id` (string, required): Feed ID
+- `xsec_token` (string, required): 安全令牌
+
+**响应**
+```json
+{
+  "success": true,
+  "data": {
+    "feed_id": "64f1a2b3c4d5e6f7a8b9c0d1",
+    "success": true
+  },
+  "message": "操作成功"
+}
+```
+
 ---
 
 ### 5. 用户信息
@@ -809,6 +883,10 @@ Content-Type: application/json
 | `LIST_FEEDS_FAILED` | 500 | 获取 Feeds 列表失败 |
 | `SEARCH_FEEDS_FAILED` | 500 | 搜索 Feeds 失败 |
 | `GET_FEED_DETAIL_FAILED` | 500 | 获取 Feed 详情失败 |
+| `LIKE_FEED_FAILED` | 500 | 点赞 Feed 失败 |
+| `UNLIKE_FEED_FAILED` | 500 | 取消点赞 Feed 失败 |
+| `FAVORITE_FEED_FAILED` | 500 | 收藏 Feed 失败 |
+| `UNFAVORITE_FEED_FAILED` | 500 | 取消收藏 Feed 失败 |
 | `GET_USER_PROFILE_FAILED` | 500 | 获取用户主页信息失败 |
 | `GET_MY_PROFILE_FAILED` | 500 | 获取当前用户信息失败 |
 | `POST_COMMENT_FAILED` | 500 | 发表评论失败 |
