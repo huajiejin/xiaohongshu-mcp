@@ -36,6 +36,8 @@ go.work.sum
 
 # Build artifacts
 xiaohongshu-mcp
+go-rod-playground
+login
 
 # Test scripts
 test_*.sh
