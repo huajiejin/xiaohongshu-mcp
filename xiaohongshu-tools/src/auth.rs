@@ -53,8 +53,6 @@ pub async fn check_status(opts: &BrowserOptions) -> Result<bool> {
     let browser = browser::create_browser(opts).await?;
     let page = browser::create_page_with_cookies(&browser, XHS_URL).await?;
 
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
     is_logged_in(&page).await
 }
 

@@ -1,6 +1,7 @@
 use crate::cookies::{self, Cookie};
 use anyhow::{Result, anyhow};
 use chromiumoxide::browser::{Browser, BrowserConfig};
+use chromiumoxide::cdp::browser_protocol::network::{CookieParam, SetCookiesParams};
 use chromiumoxide::page::Page;
 use futures::StreamExt;
 use rand::Rng;
@@ -92,15 +93,15 @@ pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
 }
 
 pub async fn create_page_with_cookies(browser: &Browser, url: &str) -> Result<Page> {
-    let page = browser.new_page(url).await?;
+    let page = browser.new_page("about:blank").await?;
     page.enable_stealth_mode().await?;
 
     let cookies = cookies::load_cookies()?;
     if !cookies.is_empty() {
-        let cdp_cookies: Vec<chromiumoxide::cdp::browser_protocol::network::CookieParam> = cookies
+        let cdp_cookies: Vec<CookieParam> = cookies
             .iter()
             .map(|c| {
-                chromiumoxide::cdp::browser_protocol::network::CookieParam::builder()
+                CookieParam::builder()
                     .name(&c.name)
                     .value(&c.value)
                     .domain(c.domain.as_deref().unwrap_or(".xiaohongshu.com"))
@@ -109,8 +110,10 @@ pub async fn create_page_with_cookies(browser: &Browser, url: &str) -> Result<Pa
                     .unwrap()
             })
             .collect();
-        page.set_cookies(cdp_cookies).await?;
+        page.execute(SetCookiesParams::new(cdp_cookies)).await?;
     }
+
+    page.goto(url).await?;
 
     Ok(page)
 }
