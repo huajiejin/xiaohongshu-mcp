@@ -1,6 +1,6 @@
 # HANDOFF.md — xiaohongshu-tools Development Context
 
-> Last updated after completing Phase 1 (anti-detection, human behavior, browse command)
+> Last updated after completing Phase 1 + output module and best practices pass
 
 ## What Was Done
 
@@ -35,7 +35,7 @@
 
 **`src/human.rs`** — New module (249 lines):
 - `BehaviorConfig` with 7 configurable delay ranges (human_delay, reaction_time, hover_time, etc.)
-- `HumanBehavior` struct with `ThreadRng`
+- `HumanBehavior` struct with `StdRng` (Send-safe)
 - `random_delay()` — Gaussian-distributed random sleep
 - `scroll_page()` — variable delta with noise, stagnation detection, big sprint recovery
 - `human_click()` — move mouse to element, hover delay, click
@@ -79,14 +79,48 @@
 - Calls `cookies::delete_cookies()` to remove cookie file
 - No browser launch needed
 
+### Batch 7: Structured Output Module
+
+**`src/output.rs`** — New module:
+- `Format` enum (Text/Json) with `FromStr` parsing
+- `Output` struct with `result()` method — writes to stdout based on format
+- `--format` global CLI flag (default: text)
+
+**`src/auth.rs`** — Commands now return serializable result structs:
+- `LoginResult { logged_in: bool }`
+- `StatusResult { logged_in: bool }`
+- `LogoutResult { logged_out: bool }`
+
+**`src/commands/browse.rs`** — Returns `BrowseResult { total, posts: Vec<PostItem>, duration_secs }`
+
+**`src/bin/xiaohongshu-cli/main.rs`** — All commands route results through `Output::result()`
+
+### Batch 8: Rust Best Practices Pass
+
+**Multiple files** — Clippy compliance (0 warnings with `-W clippy::nursery`):
+- `browser.rs`: scoped `rng` to avoid `!Send` across `.await`, `.get()` over `[]`, removed redundant clone
+- `human.rs`: `ThreadRng` → `StdRng` (Send-safe), `const fn` where possible, derived `Eq`
+- `browse.rs`: scoped local `rng` to avoid `!Send` across `.await`
+- `cookies.rs`: `unwrap_or` → `unwrap_or_else`
+- All non-test `unwrap()` eliminated
+
+### Batch 9: Logging Level Cleanup
+
+**Multiple files** — Separated result data from logging:
+- 12 statements downgraded (`info!` → `debug!`, 1 `warn!` → `debug!`)
+- `info!` only for interactive prompts (QR scan prompts, auto-open fallback)
+- `warn!` only for actionable issues (not logged in, browse failures)
+- **`AGENTS.md`** created with logging and output conventions
+
 ## Current Architecture
 
 ```
 src/
 ├── lib.rs              # Module declarations
-├── auth.rs             # Login (QR scan) + check_status, uses BrowserOptions
+├── auth.rs             # Login (QR scan) + check_status, returns structured results
 ├── browser.rs          # Browser launch (chromiumoxide), stealth, cookies injection, proxy, viewport
 ├── cookies.rs          # Cookie persist/load/delete (JSON file at config dir)
+├── output.rs           # Structured output (text/json) via --format flag
 ├── retry.rs            # Generic retry with exponential backoff + jitter
 ├── human.rs            # Human behavior simulation (delays, scrolling, clicking)
 ├── extractor.rs        # Extract data from window.__INITIAL_STATE__ via JS eval
@@ -97,7 +131,7 @@ src/
 │   └── browse.rs       # Browse explore feed with filtering and interaction
 └── bin/
     └── xiaohongshu-cli/
-        └── main.rs     # CLI entry point (clap), auth/login/logout/status, browse
+        └── main.rs     # CLI entry point (clap), --format, --headless, --proxy
 ```
 
 ## CLI Usage (current)
@@ -117,6 +151,9 @@ xhs browse --max_posts 10               # Stop after 10 matched posts
 xhs browse --scroll_speed slow          # Scroll speed: slow, normal, fast
 xhs browse --interact                   # Click into posts and scroll comments
 xhs browse --duration 300               # Auto-exit after 5 minutes
+
+xhs --format json auth status           # JSON output for agents
+xhs --format json browse --max_posts 5  # JSON browse results
 ```
 
 ## What's Next (PLAN.md Reference)
@@ -138,7 +175,6 @@ All will use `src/extractor.rs` for reading `window.__INITIAL_STATE__` via JS ev
 - Multi-account sessions (`--profile` flag)
 - Adaptive rate limiting
 - Cookie encryption at rest
-- Output formats (JSON/CSV/table)
 - Daemon mode
 
 ## Key Design Decisions
