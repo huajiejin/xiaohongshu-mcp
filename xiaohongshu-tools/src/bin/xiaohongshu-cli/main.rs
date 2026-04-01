@@ -38,6 +38,7 @@ async fn main() -> anyhow::Result<()> {
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,chromiumoxide=error")),
         )
+        .with_target(false)
         .init();
 
     let cli = Cli::parse();
