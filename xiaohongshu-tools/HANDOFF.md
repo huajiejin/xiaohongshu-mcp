@@ -1,6 +1,6 @@
 # HANDOFF.md — xiaohongshu-tools Development Context
 
-> Last updated after completing Phase 1 Batch 1 & 2 (anti-detection foundation + retry)
+> Last updated after completing Phase 1 (anti-detection, human behavior, browse command)
 
 ## What Was Done
 
@@ -31,64 +31,107 @@
 
 **`src/lib.rs`** — Added `pub mod retry;`
 
+### Batch 3: Human Behavior Simulation
+
+**`src/human.rs`** — New module (249 lines):
+- `BehaviorConfig` with 7 configurable delay ranges (human_delay, reaction_time, hover_time, etc.)
+- `HumanBehavior` struct with `ThreadRng`
+- `random_delay()` — Gaussian-distributed random sleep
+- `scroll_page()` — variable delta with noise, stagnation detection, big sprint recovery
+- `human_click()` — move mouse to element, hover delay, click
+- `interact_with_element()` — scroll into view → reaction → hover → click → read
+- Three scroll speed modes: `Slow`, `Normal`, `Fast`
+- `ScrollSpeed` enum with `FromStr` parsing
+
+### Batch 4: Login Image + Shared Utils
+
+**`src/login_image.rs`** — Extract QR code image from login page:
+- Fetches `.qrcode-img` src, decodes data URL via `base64`
+- Saves to temp file, opens with system viewer (`open`/`xdg-open`)
+- Falls back gracefully if image fetch fails
+
+**`src/utils.rs`** — Shared utilities:
+- `poll_until()` — generic async polling with timeout + interval
+- `decode_data_url()` — parse `data:image/...;base64,...` into bytes
+- `open_file()` — cross-platform file opener
+
+**`Cargo.toml`** — Added `base64 = "0.22"` dependency
+
+### Batch 5: Browse Command + Extractor
+
+**`src/extractor.rs`** — New module:
+- `extract_initial_state()` — reads `window.__INITIAL_STATE__` via JS eval
+- `extract_feed_items()` — parses feed items from initial state JSON
+- `extract_note_detail()` — extracts note content, comments, user info
+
+**`src/commands/browse.rs`** — Browse explore feed command:
+- `BrowseOptions` with keywords, exclude, max_posts, scroll_speed, interact, duration
+- Scrolls explore feed, filters posts by keywords/exclude
+- Optional `--interact` mode: click into posts, scroll comments, close
+- `--duration` auto-exit timer
+- `--max_posts` limit on matched posts
+
+**`src/commands/mod.rs`** — Commands module root
+
+### Batch 6: Auth Logout
+
+**`src/bin/xiaohongshu-cli/main.rs`** — Added `auth logout` subcommand:
+- Calls `cookies::delete_cookies()` to remove cookie file
+- No browser launch needed
+
 ## Current Architecture
 
 ```
 src/
-├── lib.rs              # Module declarations: auth, browser, cookies, retry
+├── lib.rs              # Module declarations
 ├── auth.rs             # Login (QR scan) + check_status, uses BrowserOptions
 ├── browser.rs          # Browser launch (chromiumoxide), stealth, cookies injection, proxy, viewport
-├── cookies.rs          # Cookie persist/load/delete (JSON file at ~/.config/xiaohongshu/)
+├── cookies.rs          # Cookie persist/load/delete (JSON file at config dir)
 ├── retry.rs            # Generic retry with exponential backoff + jitter
+├── human.rs            # Human behavior simulation (delays, scrolling, clicking)
+├── extractor.rs        # Extract data from window.__INITIAL_STATE__ via JS eval
+├── login_image.rs      # QR code image extraction and display
+├── utils.rs            # Shared utilities (polling, data URL decode, file open)
+├── commands/
+│   ├── mod.rs
+│   └── browse.rs       # Browse explore feed with filtering and interaction
 └── bin/
     └── xiaohongshu-cli/
-        └── main.rs     # CLI entry point (clap), --headless --proxy flags
+        └── main.rs     # CLI entry point (clap), auth/login/logout/status, browse
 ```
 
 ## CLI Usage (current)
 
 ```bash
 xhs auth login                          # Opens browser, scan QR to login
+xhs auth logout                         # Remove saved cookies
 xhs auth status                         # Check if cookies are still valid
 xhs --proxy socks5://host:port auth login  # Use proxy
 xhs --headless auth status              # Headless status check
 XHS_PROXY=http://proxy:8080 xhs auth login  # Proxy via env var
+
+xhs browse                              # Browse explore feed
+xhs browse --keywords cat,dog           # Only interact with matching posts
+xhs browse --exclude ad,sponsored       # Skip matching posts
+xhs browse --max_posts 10               # Stop after 10 matched posts
+xhs browse --scroll_speed slow          # Scroll speed: slow, normal, fast
+xhs browse --interact                   # Click into posts and scroll comments
+xhs browse --duration 300               # Auto-exit after 5 minutes
 ```
 
 ## What's Next (PLAN.md Reference)
 
-### Batch 3: Human Behavior Simulation (next priority, 2-3 sessions)
-
-This is the **biggest anti-detection gap** vs the competitor. Create `src/human.rs`:
-
-1. **3a — Core delays + scroll simulation** (session 1):
-   - `BehaviorConfig` with 7 delay ranges (human_delay, reaction_time, hover_time, read_time, short_read, scroll_wait, post_scroll)
-   - `HumanBehavior` struct with `ThreadRng`
-   - `random_delay()` — Gaussian-distributed random sleep
-   - `scroll_page()` — variable delta based on viewport + noise, stagnation detection
-   - Three scroll speed modes: slow (1200ms), normal (600ms), fast (300ms)
-
-2. **3b — Mouse movement + click simulation** (session 2):
-   - `human_click()` — move mouse to element center, hover delay, then click
-   - `interact_with_element()` — scroll into view -> reaction time -> hover -> click -> read
-   - `stagnation_recovery()` — "big sprint" when scroll stops progressing
-
-3. **3c — Integration** (session 3):
-   - Integrate `HumanBehavior` into auth flow
-   - Use `retry::retry()` wrapper for page operations in auth.rs
-   - Prepare for Phase 2 commands (search, feed detail, etc.)
-
 ### Phase 2: Core Features
 
-After Batch 3, implement feature parity with the competitor:
+Implement feature parity with the competitor:
 - `xhs search <query>` — search with filters
 - `xhs feed <note_id>` — note detail with comments
-- `xhs explore` — browse homepage feed
+- `xhs explore` — browse homepage feed (partially done via `browse` command)
 - `xhs profile <user_id>` — user profile
 - `xhs like <note_id>` / `xhs favorite <note_id>`
 - `xhs comment <note_id> <text>`
 
-All will need `src/extractor.rs` for reading `window.__INITIAL_STATE__` via JS eval.
+All will use `src/extractor.rs` for reading `window.__INITIAL_STATE__` via JS eval.
 
 ### Phase 3: Competitive Edge
 
@@ -117,12 +160,13 @@ clap = { version = "4.6.0", features = ["derive"] }  # CLI
 dirs = "6.0.0"               # Config directory
 futures = "0.3.32"           # Stream handling for CDP handler
 rand = "0.9"                 # Random delays, viewport selection, jitter
-serde = { version = "1.0.228" }  # Cookie serialization
+serde = "1.0.228"            # Cookie + state serialization
 serde_json = "1.0.149"       # JSON
 thiserror = "2.0.18"         # Custom error types
 tokio = { version = "1.50.0", features = ["full"] }  # Async runtime
 tracing = "0.1.44"           # Logging
-tracing-subscriber = "0.3.23"  # Log output
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }  # Log output
+base64 = "0.22"              # Data URL decoding for login image
 ```
 
 ## Build & Test
