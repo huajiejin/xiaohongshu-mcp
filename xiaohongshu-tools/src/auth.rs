@@ -16,7 +16,7 @@ pub async fn login(opts: &BrowserOptions) -> Result<()> {
     let page = browser::create_page_with_cookies(&browser, XHS_URL).await?;
 
     if is_logged_in(&page).await? {
-        println!("Already logged in!");
+        info!("Already logged in!");
         let cookies = browser::extract_cookies(&page).await?;
         cookies::save_cookies(&cookies)?;
         return Ok(());
@@ -24,9 +24,9 @@ pub async fn login(opts: &BrowserOptions) -> Result<()> {
 
     if let Err(e) = qrcode::extract_and_render(&page).await {
         warn!("Could not render QR code in terminal: {e}");
-        println!("Please scan the QR code in the browser window...");
+        info!("Please scan the QR code in the browser window...");
     } else {
-        println!("\nPlease scan the QR code above to login.\n");
+        info!("\nPlease scan the QR code above to login.\n");
     }
 
     loop {
@@ -34,10 +34,10 @@ pub async fn login(opts: &BrowserOptions) -> Result<()> {
 
         match is_logged_in(&page).await {
             Ok(true) => {
-                println!("Login successful!");
+                info!("Login successful!");
                 let cookies = browser::extract_cookies(&page).await?;
                 cookies::save_cookies(&cookies)?;
-                println!("Cookies saved");
+                info!("Cookies saved");
                 break;
             }
             Ok(false) => continue,

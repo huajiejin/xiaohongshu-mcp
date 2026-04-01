@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use tracing::info;
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 
@@ -54,9 +55,9 @@ async fn main() -> anyhow::Result<()> {
             AuthCommands::Status => {
                 let logged_in = auth::check_status(&opts).await?;
                 if logged_in {
-                    println!("Logged in");
+                    info!("Logged in");
                 } else {
-                    println!("Not logged in");
+                    info!("Not logged in");
                 }
             }
         },
