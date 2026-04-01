@@ -1,5 +1,6 @@
 use crate::browser::{self, BrowserOptions};
 use crate::cookies;
+use crate::qrcode;
 use anyhow::Result;
 use chromiumoxide::page::Page;
 use std::time::Duration;
@@ -21,7 +22,12 @@ pub async fn login(opts: &BrowserOptions) -> Result<()> {
         return Ok(());
     }
 
-    println!("Please scan the QR code to login...");
+    if let Err(e) = qrcode::extract_and_render(&page).await {
+        warn!("Could not render QR code in terminal: {e}");
+        println!("Please scan the QR code in the browser window...");
+    } else {
+        println!("\nPlease scan the QR code above to login.\n");
+    }
 
     loop {
         tokio::time::sleep(Duration::from_secs(2)).await;
