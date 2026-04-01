@@ -4,7 +4,9 @@ use anyhow::Result;
 use chromiumoxide::element::Element;
 use chromiumoxide::page::Page;
 use rand::Rng;
+use serde::Serialize;
 use std::collections::HashSet;
+use std::fmt;
 use std::time::{Duration, Instant};
 use tracing::{info, warn};
 
@@ -18,6 +20,29 @@ const COMMENT_CONTAINER_SELECTORS: &[&str] = &[
     "#noteContainer",
 ];
 
+#[derive(Serialize)]
+pub struct PostItem {
+    pub title: String,
+    pub href: String,
+}
+
+#[derive(Serialize)]
+pub struct BrowseResult {
+    pub total: usize,
+    pub posts: Vec<PostItem>,
+    pub duration_secs: u64,
+}
+
+impl fmt::Display for BrowseResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Matched {} posts in {}s", self.total, self.duration_secs)?;
+        for (i, post) in self.posts.iter().enumerate() {
+            writeln!(f, "  {}. {} | {}", i + 1, post.title, post.href)?;
+        }
+        Ok(())
+    }
+}
+
 pub struct BrowseOptions {
     pub keywords: Vec<String>,
     pub exclude: Vec<String>,
@@ -27,7 +52,7 @@ pub struct BrowseOptions {
     pub duration: Option<u64>,
 }
 
-pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<()> {
+pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<BrowseResult> {
     let browser = browser::create_browser(browser_opts).await?;
     let page = browser::create_page_with_cookies(&browser, EXPLORE_URL).await?;
 
@@ -42,11 +67,11 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
 
     let mut human = HumanBehavior::new();
     let mut seen_hrefs = HashSet::new();
-    let mut matched_count = 0usize;
+    let mut posts: Vec<PostItem> = Vec::new();
     let start = Instant::now();
 
     loop {
-        if should_stop(opts, matched_count, start) {
+        if should_stop(opts, posts.len(), start) {
             break;
         }
 
@@ -79,8 +104,8 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
                 continue;
             }
 
-            matched_count += 1;
-            info!("[{matched_count}] {title} | {href}");
+            info!("[{}] {} | {}", posts.len() + 1, title, href);
+            posts.push(PostItem { title, href });
 
             if opts.interact
                 && let Err(e) = browse_post(&page, section, &mut human).await
@@ -88,12 +113,12 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
                 warn!("browse post failed: {e}");
             }
 
-            if should_stop(opts, matched_count, start) {
+            if should_stop(opts, posts.len(), start) {
                 break;
             }
         }
 
-        if should_stop(opts, matched_count, start) {
+        if should_stop(opts, posts.len(), start) {
             break;
         }
 
@@ -101,12 +126,15 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
         human.random_delay(human.config.human_delay.clone()).await;
     }
 
-    info!(
-        "done: browsed {} posts in {:?}",
-        matched_count,
-        start.elapsed()
-    );
-    Ok(())
+    let duration_secs = start.elapsed().as_secs();
+    let total = posts.len();
+    info!("done: browsed {} posts in {}s", total, duration_secs);
+
+    Ok(BrowseResult {
+        total,
+        posts,
+        duration_secs,
+    })
 }
 
 async fn browse_post(page: &Page, section: &Element, human: &mut HumanBehavior) -> Result<()> {
@@ -128,8 +156,10 @@ async fn browse_post(page: &Page, section: &Element, human: &mut HumanBehavior) 
 
     close_detail(page).await;
 
-    let mut rng = rand::rng();
-    let wait = rng.random_range(1000u64..2000);
+    let wait = {
+        let mut rng = rand::rng();
+        rng.random_range(1000u64..2000)
+    };
     tokio::time::sleep(Duration::from_millis(wait)).await;
 
     Ok(())

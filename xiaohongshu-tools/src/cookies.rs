@@ -14,7 +14,8 @@ fn get_cookie_path() -> PathBuf {
 }
 
 fn get_cookie_dir() -> PathBuf {
-    get_cookie_path().parent().unwrap().to_path_buf()
+    let path = get_cookie_path();
+    path.parent().unwrap_or_else(|| path.as_ref()).to_path_buf()
 }
 
 #[derive(Debug, Serialize, Deserialize)]

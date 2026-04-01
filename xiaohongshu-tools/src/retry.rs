@@ -20,7 +20,7 @@ impl Default for RetryConfig {
 }
 
 impl RetryConfig {
-    pub fn new(max_retries: u32, base_delay: Duration, max_jitter: Duration) -> Self {
+    pub const fn new(max_retries: u32, base_delay: Duration, max_jitter: Duration) -> Self {
         Self {
             max_retries,
             base_delay,
@@ -65,7 +65,7 @@ where
         }
     }
 
-    Err(last_err.unwrap())
+    Err(last_err.expect("retry loop always stores last error before breaking"))
 }
 
 #[cfg(test)]

@@ -3,13 +3,52 @@ use crate::cookies;
 use crate::login_image;
 use anyhow::Result;
 use chromiumoxide::page::Page;
+use serde::Serialize;
+use std::fmt;
 use std::time::Duration;
 use tracing::{info, warn};
 
 const XHS_URL: &str = "https://www.xiaohongshu.com";
 const LOGIN_SELECTOR: &str = ".main-container .user .link-wrapper .channel";
 
-pub async fn login(opts: &BrowserOptions) -> Result<()> {
+#[derive(Serialize)]
+pub struct LoginResult {
+    pub logged_in: bool,
+}
+
+impl fmt::Display for LoginResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Logged in")
+    }
+}
+
+#[derive(Serialize)]
+pub struct StatusResult {
+    pub logged_in: bool,
+}
+
+impl fmt::Display for StatusResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.logged_in {
+            write!(f, "Logged in")
+        } else {
+            write!(f, "Not logged in")
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct LogoutResult {
+    pub logged_out: bool,
+}
+
+impl fmt::Display for LogoutResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Logged out")
+    }
+}
+
+pub async fn login(opts: &BrowserOptions) -> Result<LoginResult> {
     info!("Opening browser for login...");
 
     let browser = browser::create_browser(opts).await?;
@@ -19,7 +58,7 @@ pub async fn login(opts: &BrowserOptions) -> Result<()> {
         info!("Already logged in!");
         let cookies = browser::extract_cookies(&page).await?;
         cookies::save_cookies(&cookies)?;
-        return Ok(());
+        return Ok(LoginResult { logged_in: true });
     }
 
     if let Err(e) = login_image::fetch_and_open(&page).await {
@@ -48,18 +87,19 @@ pub async fn login(opts: &BrowserOptions) -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(LoginResult { logged_in: true })
 }
 
-pub async fn check_status(opts: &BrowserOptions) -> Result<bool> {
+pub async fn check_status(opts: &BrowserOptions) -> Result<StatusResult> {
     if !cookies::cookies_exist() {
-        return Ok(false);
+        return Ok(StatusResult { logged_in: false });
     }
 
     let browser = browser::create_browser(opts).await?;
     let page = browser::create_page_with_cookies(&browser, XHS_URL).await?;
 
-    is_logged_in(&page).await
+    let logged_in = is_logged_in(&page).await?;
+    Ok(StatusResult { logged_in })
 }
 
 async fn is_logged_in(page: &Page) -> Result<bool> {

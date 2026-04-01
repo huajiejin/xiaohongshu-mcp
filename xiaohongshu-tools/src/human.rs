@@ -1,7 +1,8 @@
 use anyhow::Result;
 use chromiumoxide::element::Element;
 use chromiumoxide::page::Page;
-use rand::Rng;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::ops::Range;
 use std::time::Duration;
 
@@ -32,11 +33,11 @@ impl Default for BehaviorConfig {
     }
 }
 
-fn ms(millis: u64) -> Duration {
+const fn ms(millis: u64) -> Duration {
     Duration::from_millis(millis)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrollSpeed {
     Slow,
     Normal,
@@ -44,7 +45,7 @@ pub enum ScrollSpeed {
 }
 
 impl ScrollSpeed {
-    fn base_ratio(self) -> f64 {
+    const fn base_ratio(self) -> f64 {
         match self {
             Self::Slow => 0.5,
             Self::Normal => 0.7,
@@ -52,7 +53,7 @@ impl ScrollSpeed {
         }
     }
 
-    fn push_count_range(self) -> Range<u32> {
+    const fn push_count_range(self) -> Range<u32> {
         match self {
             Self::Slow => 3..6,
             Self::Normal => 2..4,
@@ -83,7 +84,7 @@ pub struct ScrollResult {
 
 pub struct HumanBehavior {
     pub config: BehaviorConfig,
-    rng: rand::rngs::ThreadRng,
+    rng: StdRng,
 }
 
 impl Default for HumanBehavior {
@@ -100,7 +101,7 @@ impl HumanBehavior {
     pub fn with_config(config: BehaviorConfig) -> Self {
         Self {
             config,
-            rng: rand::rng(),
+            rng: StdRng::from_os_rng(),
         }
     }
 

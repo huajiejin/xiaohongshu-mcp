@@ -1,10 +1,10 @@
 use clap::{Parser, Subcommand};
-use tracing::info;
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 use xiaohongshu_tools::commands::browse;
 use xiaohongshu_tools::cookies;
 use xiaohongshu_tools::human::ScrollSpeed;
+use xiaohongshu_tools::output::{Format, Output};
 
 #[derive(Parser)]
 #[command(name = "xhs")]
@@ -15,6 +15,14 @@ struct Cli {
 
     #[arg(long, global = true)]
     proxy: Option<String>,
+
+    #[arg(
+        long,
+        global = true,
+        default_value = "text",
+        help = "Output format: text, json"
+    )]
+    format: String,
 
     #[command(subcommand)]
     command: Commands,
@@ -79,6 +87,9 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
+    let format: Format = cli.format.parse()?;
+    let out = Output::new(format);
+
     let opts = BrowserOptions {
         headless: cli.headless,
         proxy: cli.proxy,
@@ -87,19 +98,16 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Auth { command } => match command {
             AuthCommands::Login => {
-                auth::login(&opts).await?;
+                let result = auth::login(&opts).await?;
+                out.result(&result);
             }
             AuthCommands::Logout => {
                 cookies::delete_cookies()?;
-                info!("Logged out");
+                out.result(&auth::LogoutResult { logged_out: true });
             }
             AuthCommands::Status => {
-                let logged_in = auth::check_status(&opts).await?;
-                if logged_in {
-                    info!("Logged in");
-                } else {
-                    info!("Not logged in");
-                }
+                let result = auth::check_status(&opts).await?;
+                out.result(&result);
             }
         },
         Commands::Browse {
@@ -111,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
             duration,
         } => {
             let speed: ScrollSpeed = scroll_speed.parse()?;
-            browse::run(
+            let result = browse::run(
                 &browse::BrowseOptions {
                     keywords,
                     exclude,
@@ -123,6 +131,7 @@ async fn main() -> anyhow::Result<()> {
                 &opts,
             )
             .await?;
+            out.result(&result);
         }
     }
 

@@ -45,8 +45,14 @@ pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
         info!("Using proxy: {}", mask_proxy_credentials(p));
     }
 
-    let mut rng = rand::rng();
-    let (w, h) = COMMON_VIEWPORTS[rng.random_range(0..COMMON_VIEWPORTS.len())];
+    let (w, h) = {
+        let mut rng = rand::rng();
+        let idx = rng.random_range(0..COMMON_VIEWPORTS.len());
+        COMMON_VIEWPORTS
+            .get(idx)
+            .copied()
+            .expect("viewport index in bounds")
+    };
     info!("Viewport: {}x{}", w, h);
 
     let mut config = BrowserConfig::builder()
@@ -74,7 +80,7 @@ pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
         .arg(format!("window-size={},{}", w, h));
 
     if let Some(proxy_url) = proxy {
-        let url_owned = proxy_url.to_string();
+        let url_owned = proxy_url;
         config = config.arg(format!("proxy-server={}", url_owned));
     }
 
@@ -107,9 +113,9 @@ pub async fn create_page_with_cookies(browser: &Browser, url: &str) -> Result<Pa
                     .domain(c.domain.as_deref().unwrap_or(".xiaohongshu.com"))
                     .path(c.path.as_deref().unwrap_or("/"))
                     .build()
-                    .unwrap()
+                    .map_err(|e| anyhow::anyhow!("failed to build cookie param: {e}"))
             })
-            .collect();
+            .collect::<Result<_>>()?;
         page.execute(SetCookiesParams::new(cdp_cookies)).await?;
     }
 
