@@ -1,6 +1,6 @@
 use crate::browser::{self, BrowserOptions};
 use crate::cookies;
-use crate::qrcode;
+use crate::login_image;
 use anyhow::Result;
 use chromiumoxide::page::Page;
 use std::time::Duration;
@@ -22,8 +22,8 @@ pub async fn login(opts: &BrowserOptions) -> Result<()> {
         return Ok(());
     }
 
-    if let Err(e) = qrcode::extract_and_render(&page).await {
-        warn!("Could not render QR code in terminal: {e}");
+    if let Err(e) = login_image::fetch_and_open(&page).await {
+        warn!("Could not open login image: {e}");
         info!("Please scan the QR code in the browser window...");
     } else {
         info!("\nPlease scan the QR code above to login.\n");
