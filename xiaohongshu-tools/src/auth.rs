@@ -6,7 +6,7 @@ use chromiumoxide::page::Page;
 use serde::Serialize;
 use std::fmt;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 const XHS_URL: &str = "https://www.xiaohongshu.com";
 const LOGIN_SELECTOR: &str = ".main-container .user .link-wrapper .channel";
@@ -49,13 +49,13 @@ impl fmt::Display for LogoutResult {
 }
 
 pub async fn login(opts: &BrowserOptions) -> Result<LoginResult> {
-    info!("Opening browser for login...");
+    debug!("Opening browser for login...");
 
     let browser = browser::create_browser(opts).await?;
     let page = browser::create_page_with_cookies(&browser, XHS_URL).await?;
 
     if is_logged_in(&page).await? {
-        info!("Already logged in!");
+        debug!("Already logged in!");
         let cookies = browser::extract_cookies(&page).await?;
         cookies::save_cookies(&cookies)?;
         return Ok(LoginResult { logged_in: true });
@@ -73,10 +73,10 @@ pub async fn login(opts: &BrowserOptions) -> Result<LoginResult> {
 
         match is_logged_in(&page).await {
             Ok(true) => {
-                info!("Login successful!");
+                debug!("Login successful!");
                 let cookies = browser::extract_cookies(&page).await?;
                 cookies::save_cookies(&cookies)?;
-                info!("Cookies saved");
+                debug!("Cookies saved");
                 break;
             }
             Ok(false) => continue,

@@ -6,7 +6,7 @@ use chromiumoxide::page::Page;
 use futures::StreamExt;
 use rand::Rng;
 use std::time::Duration;
-use tracing::info;
+use tracing::debug;
 
 const COMMON_VIEWPORTS: [(u32, u32); 6] = [
     (1920, 1080),
@@ -42,7 +42,7 @@ pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
         .or_else(|| std::env::var("XHS_PROXY").ok());
 
     if let Some(ref p) = proxy {
-        info!("Using proxy: {}", mask_proxy_credentials(p));
+        debug!("Using proxy: {}", mask_proxy_credentials(p));
     }
 
     let (w, h) = {
@@ -53,7 +53,7 @@ pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
             .copied()
             .expect("viewport index in bounds")
     };
-    info!("Viewport: {}x{}", w, h);
+    debug!("Viewport: {}x{}", w, h);
 
     let mut config = BrowserConfig::builder()
         .request_timeout(Duration::from_secs(60))

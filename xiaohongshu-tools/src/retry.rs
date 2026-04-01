@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rand::Rng;
 use std::time::Duration;
-use tracing::warn;
+use tracing::debug;
 
 pub struct RetryConfig {
     pub max_retries: u32,
@@ -53,7 +53,7 @@ where
                 };
                 let total = exp_delay + jitter;
 
-                warn!(
+                debug!(
                     "Attempt {}/{} failed: {}. Retrying in {:?}",
                     attempt + 1,
                     config.max_retries,

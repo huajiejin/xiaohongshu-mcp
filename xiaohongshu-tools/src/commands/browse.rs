@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::fmt;
 use std::time::{Duration, Instant};
-use tracing::{info, warn};
+use tracing::{debug, warn};
 
 const EXPLORE_URL: &str = "https://www.xiaohongshu.com/explore";
 const FEED_SECTIONS_SELECTOR: &str = "#exploreFeeds section";
@@ -63,7 +63,7 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
     } else {
         opts.keywords.join(",")
     };
-    info!("browsing feed for [{}] (Ctrl+C to stop)", keyword_desc);
+    debug!("browsing feed for [{}] (Ctrl+C to stop)", keyword_desc);
 
     let mut human = HumanBehavior::new();
     let mut seen_hrefs = HashSet::new();
@@ -104,7 +104,7 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
                 continue;
             }
 
-            info!("[{}] {} | {}", posts.len() + 1, title, href);
+            debug!("[{}] {} | {}", posts.len() + 1, title, href);
             posts.push(PostItem { title, href });
 
             if opts.interact
@@ -128,7 +128,7 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
 
     let duration_secs = start.elapsed().as_secs();
     let total = posts.len();
-    info!("done: browsed {} posts in {}s", total, duration_secs);
+    debug!("done: browsed {} posts in {}s", total, duration_secs);
 
     Ok(BrowseResult {
         total,
@@ -189,13 +189,13 @@ fn should_stop(opts: &BrowseOptions, matched: usize, start: Instant) -> bool {
     if let Some(max) = opts.max_posts
         && matched >= max
     {
-        info!("reached max posts limit ({max})");
+        debug!("reached max posts limit ({max})");
         return true;
     }
     if let Some(dur) = opts.duration
         && start.elapsed().as_secs() >= dur
     {
-        info!("reached duration limit ({dur}s)");
+        debug!("reached duration limit ({dur}s)");
         return true;
     }
     false

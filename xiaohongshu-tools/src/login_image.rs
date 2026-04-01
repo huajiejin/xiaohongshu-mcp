@@ -4,7 +4,7 @@ use chromiumoxide::page::Page;
 use std::env;
 use std::fs;
 use std::time::Duration;
-use tracing::info;
+use tracing::{debug, info};
 
 const IMAGE_SELECTOR: &str = ".qrcode-img";
 
@@ -37,7 +37,7 @@ async fn fetch_image_bytes(page: &Page) -> Result<Vec<u8>> {
 fn save_and_open(data: &[u8]) -> Result<()> {
     let path = env::temp_dir().join(IMAGE_FILENAME);
     fs::write(&path, data).map_err(|e| anyhow!("Failed to save login image: {e}"))?;
-    info!("Login image saved to {}", path.display());
+    debug!("Login image saved to {}", path.display());
 
     if let Err(e) = utils::open_file(&path) {
         info!("Could not auto-open: {e}. Please open the file manually.");
