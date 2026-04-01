@@ -3,6 +3,7 @@ use tracing::info;
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 use xiaohongshu_tools::commands::browse;
+use xiaohongshu_tools::cookies;
 use xiaohongshu_tools::human::ScrollSpeed;
 
 #[derive(Parser)]
@@ -62,6 +63,7 @@ enum Commands {
 #[derive(Subcommand)]
 enum AuthCommands {
     Login,
+    Logout,
     Status,
 }
 
@@ -86,6 +88,10 @@ async fn main() -> anyhow::Result<()> {
         Commands::Auth { command } => match command {
             AuthCommands::Login => {
                 auth::login(&opts).await?;
+            }
+            AuthCommands::Logout => {
+                cookies::delete_cookies()?;
+                info!("Logged out");
             }
             AuthCommands::Status => {
                 let logged_in = auth::check_status(&opts).await?;
