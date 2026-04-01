@@ -4,7 +4,6 @@ use chromiumoxide::page::Page;
 use rand::Rng;
 use std::ops::Range;
 use std::time::Duration;
-use tracing::info;
 
 const MIN_SCROLL_DELTA: i64 = 400;
 
@@ -144,7 +143,6 @@ impl HumanBehavior {
         let scrolled = new_top > prev_top;
 
         if !scrolled {
-            info!("scroll stagnation, jumping to bottom");
             let _ = page
                 .evaluate_expression("window.scrollTo(0,document.body.scrollHeight)")
                 .await;
