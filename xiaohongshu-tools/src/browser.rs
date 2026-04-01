@@ -3,9 +3,51 @@ use anyhow::{Result, anyhow};
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::page::Page;
 use futures::StreamExt;
+use rand::Rng;
 use std::time::Duration;
+use tracing::info;
 
-pub async fn create_browser(headless: bool) -> Result<Browser> {
+const COMMON_VIEWPORTS: [(u32, u32); 6] = [
+    (1920, 1080),
+    (1366, 768),
+    (1536, 864),
+    (1440, 900),
+    (1280, 720),
+    (1600, 900),
+];
+
+#[derive(Default)]
+pub struct BrowserOptions {
+    pub headless: bool,
+    pub proxy: Option<String>,
+}
+
+fn mask_proxy_credentials(url: &str) -> String {
+    let Some(at_pos) = url.rfind('@') else {
+        return url.to_string();
+    };
+    let Some(proto_end) = url.find("://") else {
+        return url.to_string();
+    };
+    let proto = &url[..proto_end + 3];
+    let rest = &url[at_pos + 1..];
+    format!("{proto}***:***@{rest}")
+}
+
+pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
+    let proxy: Option<String> = opts
+        .proxy
+        .clone()
+        .or_else(|| std::env::var("XHS_PROXY").ok());
+
+    if let Some(ref p) = proxy {
+        info!("Using proxy: {}", mask_proxy_credentials(p));
+    }
+
+    let mut rng = rand::rng();
+    let (w, h) = COMMON_VIEWPORTS[rng.random_range(0..COMMON_VIEWPORTS.len())];
+    info!("Viewport: {}x{}", w, h);
+
     let mut config = BrowserConfig::builder()
         .request_timeout(Duration::from_secs(60))
         .hide()
@@ -23,10 +65,19 @@ pub async fn create_browser(headless: bool) -> Result<Browser> {
         .arg("disable-hang-monitor")
         .arg("disable-prompt-on-repost")
         .arg("disable-sync")
+        .arg("disable-infobars")
+        .arg("disable-notifications")
+        .arg("disable-blink-features=AutomationControlled")
         .arg(("force-color-profile", &["srgb"][..]))
-        .arg(("lang", &["en_US"][..]));
+        .arg(("lang", &["zh-CN"][..]))
+        .arg(format!("window-size={},{}", w, h));
 
-    if !headless {
+    if let Some(proxy_url) = proxy {
+        let url_owned = proxy_url.to_string();
+        config = config.arg(format!("proxy-server={}", url_owned));
+    }
+
+    if !opts.headless {
         config = config.with_head();
     }
 

@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand};
 use xiaohongshu_tools::auth;
+use xiaohongshu_tools::browser::BrowserOptions;
 
 #[derive(Parser)]
 #[command(name = "xhs")]
@@ -7,6 +8,9 @@ use xiaohongshu_tools::auth;
 struct Cli {
     #[arg(long, global = true)]
     headless: bool,
+
+    #[arg(long, global = true)]
+    proxy: Option<String>,
 
     #[command(subcommand)]
     command: Commands,
@@ -34,13 +38,18 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = Cli::parse();
 
+    let opts = BrowserOptions {
+        headless: cli.headless,
+        proxy: cli.proxy,
+    };
+
     match cli.command {
         Commands::Auth { command } => match command {
             AuthCommands::Login => {
-                auth::login().await?;
+                auth::login(&opts).await?;
             }
             AuthCommands::Status => {
-                let logged_in = auth::check_status(cli.headless).await?;
+                let logged_in = auth::check_status(&opts).await?;
                 if logged_in {
                     println!("Logged in");
                 } else {
