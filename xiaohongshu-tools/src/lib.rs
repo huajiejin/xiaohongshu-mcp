@@ -1,6 +1,9 @@
 pub mod auth;
 pub mod browser;
+pub mod commands;
 pub mod cookies;
+pub mod extractor;
+pub mod human;
 pub mod login_image;
 pub mod retry;
 pub mod utils;

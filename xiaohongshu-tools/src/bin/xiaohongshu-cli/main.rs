@@ -2,6 +2,8 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
+use xiaohongshu_tools::commands::browse;
+use xiaohongshu_tools::human::ScrollSpeed;
 
 #[derive(Parser)]
 #[command(name = "xhs")]
@@ -22,6 +24,38 @@ enum Commands {
     Auth {
         #[command(subcommand)]
         command: AuthCommands,
+    },
+
+    Browse {
+        #[arg(
+            long,
+            value_delimiter = ',',
+            help = "Only interact with posts matching these keywords"
+        )]
+        keywords: Vec<String>,
+
+        #[arg(
+            long,
+            value_delimiter = ',',
+            help = "Skip posts matching these keywords"
+        )]
+        exclude: Vec<String>,
+
+        #[arg(long, help = "Stop after N matched posts")]
+        max_posts: Option<usize>,
+
+        #[arg(
+            long,
+            default_value = "normal",
+            help = "Scroll speed: slow, normal, fast"
+        )]
+        scroll_speed: String,
+
+        #[arg(long, help = "Click into posts and scroll comments")]
+        interact: bool,
+
+        #[arg(long, help = "Auto-exit after N seconds")]
+        duration: Option<u64>,
     },
 }
 
@@ -62,6 +96,28 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         },
+        Commands::Browse {
+            keywords,
+            exclude,
+            max_posts,
+            scroll_speed,
+            interact,
+            duration,
+        } => {
+            let speed: ScrollSpeed = scroll_speed.parse()?;
+            browse::run(
+                &browse::BrowseOptions {
+                    keywords,
+                    exclude,
+                    max_posts,
+                    scroll_speed: speed,
+                    interact,
+                    duration,
+                },
+                &opts,
+            )
+            .await?;
+        }
     }
 
     Ok(())
