@@ -2,6 +2,28 @@
 
 > Last updated after completing Phase 1 + output module and best practices pass
 
+## New Findings (Before Refactor Work)
+
+### Explore/Browse and Search extraction gaps
+
+- Current Rust `browse` is DOM-only (`#exploreFeeds section` + `a.cover` + title span), so result fields are limited and selector changes can break extraction.
+- Go competitor search uses `window.__INITIAL_STATE__.search.feeds` (with Vue proxy fallback `value` / `_value`) and only falls back to errors when state is unavailable.
+- `browse` path data lives in `window.__INITIAL_STATE__.feed.feeds`, while `search` path data lives in `window.__INITIAL_STATE__.search.feeds` — shared extractor must support both roots.
+- Existing Rust `extractor.rs` already has `extract_initial_state()`, so we can build a reusable feed extraction layer above it.
+
+### Data model findings from real feed objects
+
+- Stable follow-up action keys are available in feed-level fields: `id` and `xsecToken`.
+- Useful note-level fields are available under `noteCard`: `type`, `displayTitle`, `user` (`userId`, `nickName`), `interactInfo` (`liked`, `likedCount`, optional `commentCount/sharedCount/collectedCount`), `cover`, optional `video.capa.duration`.
+- Cover URL can be selected by preference order: `cover.urlDefault` -> `cover.urlPre` -> `cover.url` -> matching best candidate from `cover.infoList` (`WB_DFT` preferred, then `WB_PRV`, then first non-empty).
+- Card href usually follows `/explore/{id}?xsec_token=...&xsec_source=...`; parsing href into structured parts is useful for consistent downstream tooling.
+
+### Refactor direction agreed in this session
+
+- Build a shared feed extraction module with strategy: `__INITIAL_STATE__` first, DOM card parsing fallback.
+- Refactor `browse` to consume shared extractor and return richer structured post fields (not just title/href).
+- Keep behavior simulation/interact flow, but decouple result extraction from brittle DOM-only fields.
+
 ## What Was Done
 
 ### Batch 1: Chrome Args Hardening + Proxy + Viewport Randomization
@@ -91,7 +113,7 @@
 - `StatusResult { logged_in: bool }`
 - `LogoutResult { logged_out: bool }`
 
-**`src/commands/browse.rs`** — Returns `BrowseResult { total, posts: Vec<PostItem>, duration_secs }`
+**`src/commands/browse.rs`** — Returns `BrowseResult { total, posts: Vec<FeedCard>, duration_secs }`
 
 **`src/bin/xiaohongshu-cli/main.rs`** — All commands route results through `Output::result()`
 
@@ -112,6 +134,36 @@
 - `warn!` only for actionable issues (not logged in, browse failures)
 - **`AGENTS.md`** created with logging and output conventions
 
+### Batch 10: Shared Feed Extractor + Browse Refactor (INITIAL_STATE first)
+
+**`src/feed_extract.rs`** — New shared module:
+- Added shared extraction strategy: `__INITIAL_STATE__` first, DOM card parsing fallback
+- Supports both roots via `FeedStateRoot`: `feed.feeds` (explore) and `search.feeds` (search)
+- New normalized output struct `FeedCard` with key fields for follow-up actions:
+  - `id`, `xsec_token`, `note_type`, `title`
+  - `author_name`, `author_id`
+  - `liked`, `liked_count`, `comment_count`, `shared_count`, `collected_count`
+  - `cover_url`, `video_duration_secs`
+- Added cover URL selection policy (best quality priority):
+  `urlDefault` -> `urlPre` -> `url` -> `infoList(WB_DFT)` -> `infoList(WB_PRV)` -> first non-empty
+- Added unit tests for href parsing, cover URL selection, and state item field extraction
+
+**`src/commands/browse.rs`** — Refactored to use shared extractor:
+- Replaced DOM-only extraction loop with shared `extract_feed_cards_with_fallback(..., FeedStateRoot::Explore)`
+- `BrowseResult.posts` now returns richer structured card fields (instead of title/href only)
+- Added consistent dedup key logic (`id` -> `href` -> `title`)
+- Kept interaction mode (`--interact`) and updated click flow to locate cards by href/id robustly
+
+**`src/lib.rs`**
+- Exported new shared module: `pub mod feed_extract;`
+
+### Remaining follow-up work (next session)
+
+- Reuse `src/feed_extract.rs` in upcoming `search` command (`FeedStateRoot::Search`) for shared behavior.
+- Add optional merge strategy when state data exists but misses fields (enrich from DOM instead of full fallback).
+- Design and implement `search continue` pagination token contract for agent-friendly incremental loading.
+- Add optional count normalization helpers (e.g. `1.2w` -> numeric) if downstream consumers need numeric sorting.
+
 ## Current Architecture
 
 ```
@@ -124,6 +176,7 @@ src/
 ├── retry.rs            # Generic retry with exponential backoff + jitter
 ├── human.rs            # Human behavior simulation (delays, scrolling, clicking)
 ├── extractor.rs        # Extract data from window.__INITIAL_STATE__ via JS eval
+├── feed_extract.rs     # Shared feed card extraction (INITIAL_STATE first, DOM fallback)
 ├── login_image.rs      # QR code image extraction and display
 ├── utils.rs            # Shared utilities (polling, data URL decode, file open)
 ├── commands/

@@ -5,6 +5,7 @@ pub mod browser;
 pub mod commands;
 pub mod cookies;
 pub mod extractor;
+pub mod feed_extract;
 pub mod human;
 pub mod login_image;
 pub mod output;

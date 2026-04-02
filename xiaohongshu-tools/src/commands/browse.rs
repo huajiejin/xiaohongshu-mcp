@@ -1,8 +1,8 @@
 use crate::browser::{self, BrowserOptions};
+use crate::feed_extract::{FeedCard, FeedStateRoot, extract_feed_cards_with_fallback};
 use crate::human::{HumanBehavior, ScrollSpeed};
 use crate::t;
-use anyhow::Result;
-use chromiumoxide::element::Element;
+use anyhow::{Result, anyhow};
 use chromiumoxide::page::Page;
 use rand::Rng;
 use serde::Serialize;
@@ -12,7 +12,6 @@ use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
 const EXPLORE_URL: &str = "https://www.xiaohongshu.com/explore";
-const FEED_SECTIONS_SELECTOR: &str = "#exploreFeeds section";
 const CLOSE_BTN_SELECTOR: &str = "body > div.note-detail-mask > div.close-circle";
 
 const COMMENT_CONTAINER_SELECTORS: &[&str] = &[
@@ -21,11 +20,7 @@ const COMMENT_CONTAINER_SELECTORS: &[&str] = &[
     "#noteContainer",
 ];
 
-#[derive(Serialize)]
-pub struct PostItem {
-    pub title: String,
-    pub href: String,
-}
+pub type PostItem = FeedCard;
 
 #[derive(Serialize)]
 pub struct BrowseResult {
@@ -46,6 +41,8 @@ impl fmt::Display for BrowseResult {
             )
         )?;
         for (i, post) in self.posts.iter().enumerate() {
+            let id = post.id.as_deref().unwrap_or("");
+            let xsec_token = post.xsec_token.as_deref().unwrap_or("");
             writeln!(
                 f,
                 "  {}",
@@ -53,7 +50,8 @@ impl fmt::Display for BrowseResult {
                     "browse.post_line",
                     index = i + 1,
                     title = &post.title,
-                    href = &post.href
+                    id = id,
+                    xsec_token = xsec_token,
                 )
             )?;
         }
@@ -84,7 +82,8 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
     debug!("browsing feed for [{}] (Ctrl+C to stop)", keyword_desc);
 
     let mut human = HumanBehavior::new();
-    let mut seen_hrefs = HashSet::new();
+    let mut seen_keys = HashSet::new();
+    let mut interacted_keys = HashSet::new();
     let mut posts: Vec<PostItem> = Vec::new();
     let start = Instant::now();
 
@@ -93,26 +92,22 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
             break;
         }
 
-        let sections = match page.find_elements(FEED_SECTIONS_SELECTOR).await {
-            Ok(s) => s,
+        let cards = match extract_feed_cards_with_fallback(&page, FeedStateRoot::Explore).await {
+            Ok(v) => v,
             Err(_) => {
                 human.random_delay(human.config.human_delay.clone()).await;
                 continue;
             }
         };
 
-        for section in &sections {
-            let Some(href) = extract_href(section).await else {
-                continue;
-            };
-            if seen_hrefs.contains(&href) {
+        for card in cards {
+            let key = card_unique_key(&card);
+            if seen_keys.contains(&key) {
                 continue;
             }
-            seen_hrefs.insert(href.clone());
+            seen_keys.insert(key.clone());
 
-            let Some(title) = extract_title(section).await else {
-                continue;
-            };
+            let title = card.title.clone();
 
             if matches_keywords(&title, &opts.exclude) {
                 continue;
@@ -122,13 +117,18 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
                 continue;
             }
 
-            debug!("[{}] {} | {}", posts.len() + 1, title, href);
-            posts.push(PostItem { title, href });
+            let id = card.id.clone().unwrap_or_default();
+            debug!("[{}] {} | {}", posts.len() + 1, title, id);
+            posts.push(card.clone());
 
             if opts.interact
-                && let Err(e) = browse_post(&page, section, &mut human).await
+                && !interacted_keys.contains(&key)
+                && let Err(e) = browse_post_by_card(&page, &card, &mut human).await
             {
+                interacted_keys.insert(key);
                 warn!("{}", t!("browse.browse_post_failed", e = e.to_string()));
+            } else if opts.interact {
+                interacted_keys.insert(key);
             }
 
             if should_stop(opts, posts.len(), start) {
@@ -155,11 +155,12 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
     })
 }
 
-async fn browse_post(page: &Page, section: &Element, human: &mut HumanBehavior) -> Result<()> {
-    if let Err(e) = human.human_click(page, section).await {
-        warn!("{}", t!("browse.click_post_failed", e = e.to_string()));
-        return Err(e);
-    }
+async fn browse_post_by_card(
+    page: &Page,
+    card: &FeedCard,
+    human: &mut HumanBehavior,
+) -> Result<()> {
+    click_post(page, card, FeedStateRoot::Explore).await?;
 
     human.random_delay(human.config.short_read.clone()).await;
 
@@ -181,6 +182,44 @@ async fn browse_post(page: &Page, section: &Element, human: &mut HumanBehavior) 
     tokio::time::sleep(Duration::from_millis(wait)).await;
 
     Ok(())
+}
+
+async fn click_post(page: &Page, card: &FeedCard, root: FeedStateRoot) -> Result<()> {
+    if let Some(href) = &card.href(Some(root)) {
+        let href_js = serde_json::to_string(href)?;
+        let js = format!(
+            r#"(() => {{
+                const target = {href_js};
+                const links = Array.from(document.querySelectorAll('a.cover'));
+                const found = links.find((el) => el.getAttribute('href') === target || el.href.endsWith(target));
+                if (!found) return false;
+                found.click();
+                return true;
+            }})()"#
+        );
+        let clicked = page
+            .evaluate_expression(&js)
+            .await?
+            .into_value::<serde_json::Value>()?
+            .as_bool()
+            .unwrap_or(false);
+        if clicked {
+            return Ok(());
+        }
+    }
+
+    if let Some(note_id) = &card.id {
+        let selector = format!("a.cover[href*='/explore/{note_id}']");
+        if let Ok(el) = page.find_element(&selector).await {
+            el.click().await?;
+            return Ok(());
+        }
+    }
+
+    Err(anyhow!(t!(
+        "browse.click_post_failed",
+        e = "post element not found"
+    )))
 }
 
 async fn close_detail(page: &Page) {
@@ -229,14 +268,11 @@ async fn check_login(page: &Page) {
     }
 }
 
-async fn extract_href(element: &Element) -> Option<String> {
-    let a = element.find_element("a.cover").await.ok()?;
-    a.attribute("href").await.ok().flatten()
-}
-
-async fn extract_title(element: &Element) -> Option<String> {
-    let span = element.find_element("div > div > a > span").await.ok()?;
-    span.inner_text().await.ok().flatten()
+fn card_unique_key(card: &FeedCard) -> String {
+    if let Some(id) = &card.id {
+        return format!("id:{id}");
+    }
+    format!("title:{}", card.title)
 }
 
 fn matches_keywords(text: &str, keywords: &[String]) -> bool {
