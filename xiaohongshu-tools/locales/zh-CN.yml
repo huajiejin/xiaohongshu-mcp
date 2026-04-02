@@ -14,7 +14,7 @@ cli:
   auth_login_about: "通过二维码登录"
   auth_logout_about: "删除已保存的 Cookie"
   auth_status_about: "检查当前登录状态"
-  browse_about: "浏览小红书发现页"
+  explore_about: "探索小红书发现页"
 
 auth:
   logged_in: "已登录"
@@ -25,11 +25,11 @@ auth:
   could_not_open_image: "无法打开登录图片: %{e}"
   error_checking_status: "检查登录状态出错: %{e}"
 
-browse:
+explore:
   matched_posts: "匹配到 %{count} 篇笔记，用时 %{time} 秒"
   post_line: "%{index}. %{title} | %{href}"
   not_logged_in_warn: "未登录，内容可能受限。请先运行 'xhs auth login'。"
-  browse_post_failed: "浏览笔记失败: %{e}"
+  explore_post_failed: "探索笔记失败: %{e}"
   click_post_failed: "点击笔记失败: %{e}"
   scroll_comments_failed: "滚动评论失败: %{e}"
 

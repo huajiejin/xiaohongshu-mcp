@@ -6,9 +6,9 @@
 
 ### Explore/Browse and Search extraction gaps
 
-- Current Rust `browse` is DOM-only (`#exploreFeeds section` + `a.cover` + title span), so result fields are limited and selector changes can break extraction.
+- Current Rust `explore` is DOM-only (`#exploreFeeds section` + `a.cover` + title span), so result fields are limited and selector changes can break extraction.
 - Go competitor search uses `window.__INITIAL_STATE__.search.feeds` (with Vue proxy fallback `value` / `_value`) and only falls back to errors when state is unavailable.
-- `browse` path data lives in `window.__INITIAL_STATE__.feed.feeds`, while `search` path data lives in `window.__INITIAL_STATE__.search.feeds` — shared extractor must support both roots.
+- `explore` path data lives in `window.__INITIAL_STATE__.feed.feeds`, while `search` path data lives in `window.__INITIAL_STATE__.search.feeds` — shared extractor must support both roots.
 - Existing Rust `extractor.rs` already has `extract_initial_state()`, so we can build a reusable feed extraction layer above it.
 
 ### Data model findings from real feed objects
@@ -21,7 +21,7 @@
 ### Refactor direction agreed in this session
 
 - Build a shared feed extraction module with strategy: `__INITIAL_STATE__` first, DOM card parsing fallback.
-- Refactor `browse` to consume shared extractor and return richer structured post fields (not just title/href).
+- Refactor `explore` to consume shared extractor and return richer structured post fields (not just title/href).
 - Keep behavior simulation/interact flow, but decouple result extraction from brittle DOM-only fields.
 
 ## What Was Done
@@ -86,7 +86,7 @@
 - `extract_feed_items()` — parses feed items from initial state JSON
 - `extract_note_detail()` — extracts note content, comments, user info
 
-**`src/commands/browse.rs`** — Browse explore feed command:
+**`src/commands/explore.rs`** — Explore discover feed command:
 - `BrowseOptions` with keywords, exclude, max_posts, scroll_speed, interact, duration
 - Scrolls explore feed, filters posts by keywords/exclude
 - Optional `--interact` mode: click into posts, scroll comments, close
@@ -113,7 +113,7 @@
 - `StatusResult { logged_in: bool }`
 - `LogoutResult { logged_out: bool }`
 
-**`src/commands/browse.rs`** — Returns `BrowseResult { total, posts: Vec<FeedCard>, duration_secs }`
+**`src/commands/explore.rs`** — Returns `ExploreResult { total, posts: Vec<FeedCard>, duration_secs }`
 
 **`src/bin/xiaohongshu-cli/main.rs`** — All commands route results through `Output::result()`
 
@@ -122,7 +122,7 @@
 **Multiple files** — Clippy compliance (0 warnings with `-W clippy::nursery`):
 - `browser.rs`: scoped `rng` to avoid `!Send` across `.await`, `.get()` over `[]`, removed redundant clone
 - `human.rs`: `ThreadRng` → `StdRng` (Send-safe), `const fn` where possible, derived `Eq`
-- `browse.rs`: scoped local `rng` to avoid `!Send` across `.await`
+- `explore.rs`: scoped local `rng` to avoid `!Send` across `.await`
 - `cookies.rs`: `unwrap_or` → `unwrap_or_else`
 - All non-test `unwrap()` eliminated
 
@@ -131,7 +131,7 @@
 **Multiple files** — Separated result data from logging:
 - 12 statements downgraded (`info!` → `debug!`, 1 `warn!` → `debug!`)
 - `info!` only for interactive prompts (QR scan prompts, auto-open fallback)
-- `warn!` only for actionable issues (not logged in, browse failures)
+- `warn!` only for actionable issues (not logged in, explore failures)
 - **`AGENTS.md`** created with logging and output conventions
 
 ### Batch 10: Shared Feed Extractor + Browse Refactor (INITIAL_STATE first)
@@ -148,9 +148,9 @@
   `urlDefault` -> `urlPre` -> `url` -> `infoList(WB_DFT)` -> `infoList(WB_PRV)` -> first non-empty
 - Added unit tests for href parsing, cover URL selection, and state item field extraction
 
-**`src/commands/browse.rs`** — Refactored to use shared extractor:
+**`src/commands/explore.rs`** — Refactored to use shared extractor:
 - Replaced DOM-only extraction loop with shared `extract_feed_cards_with_fallback(..., FeedStateRoot::Explore)`
-- `BrowseResult.posts` now returns richer structured card fields (instead of title/href only)
+- `ExploreResult.posts` now returns richer structured card fields (instead of title/href only)
 - Added consistent dedup key logic (`id` -> `href` -> `title`)
 - Kept interaction mode (`--interact`) and updated click flow to locate cards by href/id robustly
 
@@ -181,7 +181,7 @@ src/
 ├── utils.rs            # Shared utilities (polling, data URL decode, file open)
 ├── commands/
 │   ├── mod.rs
-│   └── browse.rs       # Browse explore feed with filtering and interaction
+│   └── explore.rs       # Explore discover feed with filtering and interaction
 └── bin/
     └── xiaohongshu-cli/
         └── main.rs     # CLI entry point (clap), --format, --headless, --proxy
@@ -197,16 +197,16 @@ xhs --proxy socks5://host:port auth login  # Use proxy
 xhs --headless auth status              # Headless status check
 XHS_PROXY=http://proxy:8080 xhs auth login  # Proxy via env var
 
-xhs browse                              # Browse explore feed
-xhs browse --keywords cat,dog           # Only interact with matching posts
-xhs browse --exclude ad,sponsored       # Skip matching posts
-xhs browse --max_posts 10               # Stop after 10 matched posts
-xhs browse --scroll_speed slow          # Scroll speed: slow, normal, fast
-xhs browse --interact                   # Click into posts and scroll comments
-xhs browse --duration 300               # Auto-exit after 5 minutes
+xhs explore                              # Explore discover feed
+xhs explore --keywords cat,dog           # Only interact with matching posts
+xhs explore --exclude ad,sponsored       # Skip matching posts
+xhs explore --max_posts 10               # Stop after 10 matched posts
+xhs explore --scroll_speed slow          # Scroll speed: slow, normal, fast
+xhs explore --interact                   # Click into posts and scroll comments
+xhs explore --duration 300               # Auto-exit after 5 minutes
 
 xhs --format json auth status           # JSON output for agents
-xhs --format json browse --max_posts 5  # JSON browse results
+xhs --format json explore --max_posts 5  # JSON explore results
 ```
 
 ## What's Next (PLAN.md Reference)
@@ -216,7 +216,7 @@ xhs --format json browse --max_posts 5  # JSON browse results
 Implement feature parity with the competitor:
 - `xhs search <query>` — search with filters
 - `xhs feed <note_id>` — note detail with comments
-- `xhs explore` — browse homepage feed (partially done via `browse` command)
+- `xhs explore` — browse homepage feed (done via `explore` command)
 - `xhs profile <user_id>` — user profile
 - `xhs like <note_id>` / `xhs favorite <note_id>`
 - `xhs comment <note_id> <text>`

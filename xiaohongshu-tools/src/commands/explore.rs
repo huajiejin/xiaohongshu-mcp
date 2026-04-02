@@ -23,19 +23,19 @@ const COMMENT_CONTAINER_SELECTORS: &[&str] = &[
 pub type PostItem = FeedCard;
 
 #[derive(Serialize)]
-pub struct BrowseResult {
+pub struct ExploreResult {
     pub total: usize,
     pub posts: Vec<PostItem>,
     pub duration_secs: u64,
 }
 
-impl fmt::Display for BrowseResult {
+impl fmt::Display for ExploreResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
             "{}",
             t!(
-                "browse.matched_posts",
+                "explore.matched_posts",
                 count = self.total,
                 time = self.duration_secs
             )
@@ -47,7 +47,7 @@ impl fmt::Display for BrowseResult {
                 f,
                 "  {}",
                 t!(
-                    "browse.post_line",
+                    "explore.post_line",
                     index = i + 1,
                     title = &post.title,
                     id = id,
@@ -59,7 +59,7 @@ impl fmt::Display for BrowseResult {
     }
 }
 
-pub struct BrowseOptions {
+pub struct ExploreOptions {
     pub keywords: Vec<String>,
     pub exclude: Vec<String>,
     pub max_posts: Option<usize>,
@@ -68,7 +68,7 @@ pub struct BrowseOptions {
     pub duration: Option<u64>,
 }
 
-pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<BrowseResult> {
+pub async fn run(opts: &ExploreOptions, browser_opts: &BrowserOptions) -> Result<ExploreResult> {
     let browser = browser::create_browser(browser_opts).await?;
     let page = browser::create_page_with_cookies(&browser, EXPLORE_URL).await?;
 
@@ -79,7 +79,7 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
     } else {
         opts.keywords.join(",")
     };
-    debug!("browsing feed for [{}] (Ctrl+C to stop)", keyword_desc);
+    debug!("exploring feed for [{}] (Ctrl+C to stop)", keyword_desc);
 
     let mut human = HumanBehavior::new();
     let mut seen_keys = HashSet::new();
@@ -123,10 +123,10 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
 
             if opts.interact
                 && !interacted_keys.contains(&key)
-                && let Err(e) = browse_post_by_card(&page, &card, &mut human).await
+                && let Err(e) = explore_post_by_card(&page, &card, &mut human).await
             {
                 interacted_keys.insert(key);
-                warn!("{}", t!("browse.browse_post_failed", e = e.to_string()));
+                warn!("{}", t!("explore.explore_post_failed", e = e.to_string()));
             } else if opts.interact {
                 interacted_keys.insert(key);
             }
@@ -146,16 +146,16 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
 
     let duration_secs = start.elapsed().as_secs();
     let total = posts.len();
-    debug!("done: browsed {} posts in {}s", total, duration_secs);
+    debug!("done: explored {} posts in {}s", total, duration_secs);
 
-    Ok(BrowseResult {
+    Ok(ExploreResult {
         total,
         posts,
         duration_secs,
     })
 }
 
-async fn browse_post_by_card(
+async fn explore_post_by_card(
     page: &Page,
     card: &FeedCard,
     human: &mut HumanBehavior,
@@ -168,7 +168,10 @@ async fn browse_post_by_card(
         .scroll_container(page, COMMENT_CONTAINER_SELECTORS)
         .await
     {
-        warn!("{}", t!("browse.scroll_comments_failed", e = e.to_string()));
+        warn!(
+            "{}",
+            t!("explore.scroll_comments_failed", e = e.to_string())
+        );
     }
 
     human.random_delay(human.config.human_delay.clone()).await;
@@ -217,7 +220,7 @@ async fn click_post(page: &Page, card: &FeedCard, root: FeedStateRoot) -> Result
     }
 
     Err(anyhow!(t!(
-        "browse.click_post_failed",
+        "explore.click_post_failed",
         e = "post element not found"
     )))
 }
@@ -242,7 +245,7 @@ async fn close_detail(page: &Page) {
     let _ = page.evaluate_expression(esc_js).await;
 }
 
-fn should_stop(opts: &BrowseOptions, matched: usize, start: Instant) -> bool {
+fn should_stop(opts: &ExploreOptions, matched: usize, start: Instant) -> bool {
     if let Some(max) = opts.max_posts
         && matched >= max
     {
@@ -264,7 +267,7 @@ async fn check_login(page: &Page) {
         .await
         .is_ok();
     if !logged_in {
-        warn!("{}", t!("browse.not_logged_in_warn"));
+        warn!("{}", t!("explore.not_logged_in_warn"));
     }
 }
 

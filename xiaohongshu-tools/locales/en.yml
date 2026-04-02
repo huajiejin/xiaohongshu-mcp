@@ -14,7 +14,7 @@ cli:
   auth_login_about: "Login via QR code"
   auth_logout_about: "Delete saved cookies"
   auth_status_about: "Check current login status"
-  browse_about: "Browse the Xiaohongshu explore feed"
+  explore_about: "Explore the Xiaohongshu discover feed"
 
 auth:
   logged_in: "Logged in"
@@ -25,11 +25,11 @@ auth:
   could_not_open_image: "Could not open login image: %{e}"
   error_checking_status: "Error checking login status: %{e}"
 
-browse:
+explore:
   matched_posts: "Matched %{count} posts in %{time}s"
   post_line: "%{index}. %{title} | %{href}"
   not_logged_in_warn: "not logged in, feed may be limited. Run 'xhs auth login' first."
-  browse_post_failed: "browse post failed: %{e}"
+  explore_post_failed: "explore post failed: %{e}"
   click_post_failed: "click post failed: %{e}"
   scroll_comments_failed: "scroll comments failed: %{e}"
 

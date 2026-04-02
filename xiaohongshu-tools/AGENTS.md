@@ -9,7 +9,7 @@ This CLI serves both humans and agents (via `--format json`). Follow these rules
 
 ### Key Principle
 
-If a piece of information is already in the command's result struct (e.g. `BrowseResult`, `StatusResult`), it must NOT be logged at info level. Duplicate it at `debug!` at most. The result goes to stdout via the `output` module; logs go to stderr via tracing.
+If a piece of information is already in the command's result struct (e.g. `ExploreResult`, `StatusResult`), it must NOT be logged at info level. Duplicate it at `debug!` at most. The result goes to stdout via the `output` module; logs go to stderr via tracing.
 
 ## Structured Output
 

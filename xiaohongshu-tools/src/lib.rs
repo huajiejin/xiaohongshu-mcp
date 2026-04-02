@@ -47,8 +47,8 @@ pub mod i18n {
     pub fn cli_auth_status_about() -> String {
         t!("cli.auth_status_about").to_string()
     }
-    pub fn cli_browse_about() -> String {
-        t!("cli.browse_about").to_string()
+    pub fn cli_explore_about() -> String {
+        t!("cli.explore_about").to_string()
     }
     pub fn cli_headless_help() -> String {
         t!("cli.headless_help").to_string()

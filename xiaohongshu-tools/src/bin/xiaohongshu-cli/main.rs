@@ -1,7 +1,7 @@
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
-use xiaohongshu_tools::commands::browse;
+use xiaohongshu_tools::commands::explore;
 use xiaohongshu_tools::human::ScrollSpeed;
 use xiaohongshu_tools::i18n;
 use xiaohongshu_tools::output::{Format, Output};
@@ -32,7 +32,7 @@ enum Commands {
         command: AuthCommands,
     },
 
-    Browse {
+    Explore {
         #[arg(long, value_delimiter = ',')]
         keywords: Vec<String>,
 
@@ -74,8 +74,8 @@ fn build_command() -> clap::Command {
             .mut_subcommand("logout", |s| s.about(i18n::cli_auth_logout_about()))
             .mut_subcommand("status", |s| s.about(i18n::cli_auth_status_about()))
     });
-    cmd.mut_subcommand("browse", |s| {
-        s.about(i18n::cli_browse_about())
+    cmd.mut_subcommand("explore", |s| {
+        s.about(i18n::cli_explore_about())
             .mut_arg("keywords", |a| a.help(i18n::cli_keywords_help()))
             .mut_arg("exclude", |a| a.help(i18n::cli_exclude_help()))
             .mut_arg("max_posts", |a| a.help(i18n::cli_max_posts_help()))
@@ -138,7 +138,7 @@ async fn main() -> anyhow::Result<()> {
                 out.result(&result);
             }
         },
-        Commands::Browse {
+        Commands::Explore {
             keywords,
             exclude,
             max_posts,
@@ -147,8 +147,8 @@ async fn main() -> anyhow::Result<()> {
             duration,
         } => {
             let speed: ScrollSpeed = scroll_speed.parse()?;
-            let result = browse::run(
-                &browse::BrowseOptions {
+            let result = explore::run(
+                &explore::ExploreOptions {
                     keywords,
                     exclude,
                     max_posts,
