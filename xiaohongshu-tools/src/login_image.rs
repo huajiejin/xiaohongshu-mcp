@@ -1,3 +1,4 @@
+use crate::t;
 use crate::utils;
 use anyhow::{Result, anyhow};
 use chromiumoxide::page::Page;
@@ -31,16 +32,20 @@ async fn fetch_image_bytes(page: &Page) -> Result<Vec<u8>> {
         }
     })
     .await
-    .map_err(|_| anyhow!("Timed out waiting for login image ({:?})", WAIT_TIMEOUT))
+    .map_err(|_| anyhow!("{}", t!("login_image.timeout")))
 }
 
 fn save_and_open(data: &[u8]) -> Result<()> {
     let path = env::temp_dir().join(IMAGE_FILENAME);
-    fs::write(&path, data).map_err(|e| anyhow!("Failed to save login image: {e}"))?;
+    fs::write(&path, data)
+        .map_err(|e| anyhow!("{}", t!("login_image.save_failed", e = e.to_string())))?;
     debug!("Login image saved to {}", path.display());
 
     if let Err(e) = utils::open_file(&path) {
-        info!("Could not auto-open: {e}. Please open the file manually.");
+        info!(
+            "{}",
+            t!("login_image.could_not_auto_open", e = e.to_string())
+        );
     }
 
     Ok(())

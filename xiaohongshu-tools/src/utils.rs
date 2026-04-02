@@ -1,3 +1,4 @@
+use crate::t;
 use anyhow::{Result, anyhow, bail};
 use base64::Engine;
 use std::path::Path;
@@ -21,7 +22,10 @@ where
         }
 
         if Instant::now() >= deadline {
-            bail!("Timed out after {:?}", timeout);
+            bail!(
+                "{}",
+                t!("utils.timeout", duration = format!("{:?}", timeout))
+            );
         }
 
         tokio::time::sleep(interval).await;
@@ -29,17 +33,18 @@ where
 }
 
 pub fn decode_data_url(src: &str) -> Result<Vec<u8>> {
+    let prefix = &src[..src.len().min(30)];
     let encoded = src
         .strip_prefix("data:")
-        .ok_or_else(|| anyhow!("Expected data URL, got: {}..", &src[..src.len().min(30)]))?;
+        .ok_or_else(|| anyhow!("{}", t!("utils.expected_data_url", prefix = prefix)))?;
     let base64_data = encoded
         .find(';')
         .and_then(|i| encoded.get(i + 1..))
         .and_then(|s| s.strip_prefix("base64,"))
-        .ok_or_else(|| anyhow!("Invalid data URL format"))?;
+        .ok_or_else(|| anyhow!("{}", t!("utils.invalid_data_url")))?;
     base64::engine::general_purpose::STANDARD
         .decode(base64_data)
-        .map_err(|e| anyhow!("Base64 decode error: {e}"))
+        .map_err(|e| anyhow!("{}", t!("utils.base64_error", e = e.to_string())))
 }
 
 pub fn open_file(path: &Path) -> Result<()> {
@@ -53,6 +58,6 @@ pub fn open_file(path: &Path) -> Result<()> {
         Command::new("xdg-open").arg(path).status()
     };
 
-    result.map_err(|e| anyhow!("Failed to open file: {e}"))?;
+    result.map_err(|e| anyhow!("{}", t!("utils.open_file_failed", e = e.to_string())))?;
     Ok(())
 }

@@ -1,4 +1,5 @@
 use crate::cookies::{self, Cookie};
+use crate::t;
 use anyhow::{Result, anyhow};
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::network::{CookieParam, SetCookiesParams};
@@ -90,7 +91,7 @@ pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
 
     let cfg = config
         .build()
-        .map_err(|e| anyhow!("Browser config error: {}", e))?;
+        .map_err(|e| anyhow!("{}", t!("browser.config_error", e = e.to_string())))?;
     let (browser, mut handler) = Browser::launch(cfg).await?;
 
     tokio::spawn(async move { while handler.next().await.is_some() {} });
@@ -113,7 +114,9 @@ pub async fn create_page_with_cookies(browser: &Browser, url: &str) -> Result<Pa
                     .domain(c.domain.as_deref().unwrap_or(".xiaohongshu.com"))
                     .path(c.path.as_deref().unwrap_or("/"))
                     .build()
-                    .map_err(|e| anyhow::anyhow!("failed to build cookie param: {e}"))
+                    .map_err(|e| {
+                        anyhow::anyhow!("{}", t!("browser.cookie_param_error", e = e.to_string()))
+                    })
             })
             .collect::<Result<_>>()?;
         page.execute(SetCookiesParams::new(cdp_cookies)).await?;

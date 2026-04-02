@@ -1,0 +1,60 @@
+cli:
+  about: "Xiaohongshu CLI.\n\nRepo: https://github.com/plcaeholder/xiaohongshu-tools"
+  format_help: "Output format: text, json"
+  headless_help: "Run browser in headless mode"
+  proxy_help: "Proxy server URL"
+  lang_help: "Language: en, zh-CN"
+  keywords_help: "Only interact with posts matching these keywords"
+  exclude_help: "Skip posts matching these keywords"
+  max_posts_help: "Stop after N matched posts"
+  scroll_speed_help: "Scroll speed: slow, normal, fast"
+  interact_help: "Click into posts and scroll comments"
+  duration_help: "Auto-exit after N seconds"
+  auth_about: "Manage authentication (login, logout, status)"
+  auth_login_about: "Login via QR code"
+  auth_logout_about: "Delete saved cookies"
+  auth_status_about: "Check current login status"
+  browse_about: "Browse the Xiaohongshu explore feed"
+
+auth:
+  logged_in: "Logged in"
+  not_logged_in: "Not logged in"
+  logged_out: "Logged out"
+  scan_qr_browser: "Please scan the QR code in the browser window..."
+  scan_qr_image: "\nPlease scan the QR code above to login.\n"
+  could_not_open_image: "Could not open login image: %{e}"
+  error_checking_status: "Error checking login status: %{e}"
+
+browse:
+  matched_posts: "Matched %{count} posts in %{time}s"
+  post_line: "%{index}. %{title} | %{href}"
+  not_logged_in_warn: "not logged in, feed may be limited. Run 'xhs auth login' first."
+  browse_post_failed: "browse post failed: %{e}"
+  click_post_failed: "click post failed: %{e}"
+  scroll_comments_failed: "scroll comments failed: %{e}"
+
+output:
+  unknown_format: "unknown format: %{format}, expected 'text' or 'json'"
+  serialize_error: "error serializing output: %{e}"
+
+human:
+  invalid_scroll_speed: "invalid scroll speed '%{speed}', expected slow/normal/fast"
+
+browser:
+  config_error: "Browser config error: %{e}"
+  cookie_param_error: "failed to build cookie param: %{e}"
+
+login_image:
+  timeout: "Timed out waiting for login image (%{timeout:?})"
+  save_failed: "Failed to save login image: %{e}"
+  could_not_auto_open: "Could not auto-open: %{e}. Please open the file manually."
+
+utils:
+  timeout: "Timed out after %{duration:?}"
+  expected_data_url: "Expected data URL, got: %{prefix}.."
+  invalid_data_url: "Invalid data URL format"
+  base64_error: "Base64 decode error: %{e}"
+  open_file_failed: "Failed to open file: %{e}"
+
+extractor:
+  initial_state_null: "window.__INITIAL_STATE__ is null"

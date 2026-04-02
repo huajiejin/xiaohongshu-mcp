@@ -1,5 +1,6 @@
 use crate::browser::{self, BrowserOptions};
 use crate::human::{HumanBehavior, ScrollSpeed};
+use crate::t;
 use anyhow::Result;
 use chromiumoxide::element::Element;
 use chromiumoxide::page::Page;
@@ -35,9 +36,26 @@ pub struct BrowseResult {
 
 impl fmt::Display for BrowseResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Matched {} posts in {}s", self.total, self.duration_secs)?;
+        writeln!(
+            f,
+            "{}",
+            t!(
+                "browse.matched_posts",
+                count = self.total,
+                time = self.duration_secs
+            )
+        )?;
         for (i, post) in self.posts.iter().enumerate() {
-            writeln!(f, "  {}. {} | {}", i + 1, post.title, post.href)?;
+            writeln!(
+                f,
+                "  {}",
+                t!(
+                    "browse.post_line",
+                    index = i + 1,
+                    title = &post.title,
+                    href = &post.href
+                )
+            )?;
         }
         Ok(())
     }
@@ -110,7 +128,7 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
             if opts.interact
                 && let Err(e) = browse_post(&page, section, &mut human).await
             {
-                warn!("browse post failed: {e}");
+                warn!("{}", t!("browse.browse_post_failed", e = e.to_string()));
             }
 
             if should_stop(opts, posts.len(), start) {
@@ -139,7 +157,7 @@ pub async fn run(opts: &BrowseOptions, browser_opts: &BrowserOptions) -> Result<
 
 async fn browse_post(page: &Page, section: &Element, human: &mut HumanBehavior) -> Result<()> {
     if let Err(e) = human.human_click(page, section).await {
-        warn!("click post failed: {e}");
+        warn!("{}", t!("browse.click_post_failed", e = e.to_string()));
         return Err(e);
     }
 
@@ -149,7 +167,7 @@ async fn browse_post(page: &Page, section: &Element, human: &mut HumanBehavior) 
         .scroll_container(page, COMMENT_CONTAINER_SELECTORS)
         .await
     {
-        warn!("scroll comments failed: {e}");
+        warn!("{}", t!("browse.scroll_comments_failed", e = e.to_string()));
     }
 
     human.random_delay(human.config.human_delay.clone()).await;
@@ -207,7 +225,7 @@ async fn check_login(page: &Page) {
         .await
         .is_ok();
     if !logged_in {
-        warn!("not logged in, feed may be limited. Run 'xhs auth login' first.");
+        warn!("{}", t!("browse.not_logged_in_warn"));
     }
 }
 

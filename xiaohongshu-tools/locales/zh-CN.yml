@@ -1,0 +1,60 @@
+cli:
+  about: "小红书 CLI。\n\n仓库: https://github.com/plcaeholder/xiaohongshu-tools"
+  format_help: "输出格式: text, json"
+  headless_help: "以无头模式运行浏览器"
+  proxy_help: "代理服务器地址"
+  lang_help: "语言: en, zh-CN"
+  keywords_help: "仅与匹配这些关键词的笔记互动"
+  exclude_help: "跳过匹配这些关键词的笔记"
+  max_posts_help: "匹配 N 篇笔记后停止"
+  scroll_speed_help: "滚动速度: slow, normal, fast"
+  interact_help: "点击进入笔记并滚动评论区"
+  duration_help: "N 秒后自动退出"
+  auth_about: "管理认证（登录、登出、状态）"
+  auth_login_about: "通过二维码登录"
+  auth_logout_about: "删除已保存的 Cookie"
+  auth_status_about: "检查当前登录状态"
+  browse_about: "浏览小红书发现页"
+
+auth:
+  logged_in: "已登录"
+  not_logged_in: "未登录"
+  logged_out: "已登出"
+  scan_qr_browser: "请在浏览器窗口中扫描二维码..."
+  scan_qr_image: "\n请扫描上方二维码登录。\n"
+  could_not_open_image: "无法打开登录图片: %{e}"
+  error_checking_status: "检查登录状态出错: %{e}"
+
+browse:
+  matched_posts: "匹配到 %{count} 篇笔记，用时 %{time} 秒"
+  post_line: "%{index}. %{title} | %{href}"
+  not_logged_in_warn: "未登录，内容可能受限。请先运行 'xhs auth login'。"
+  browse_post_failed: "浏览笔记失败: %{e}"
+  click_post_failed: "点击笔记失败: %{e}"
+  scroll_comments_failed: "滚动评论失败: %{e}"
+
+output:
+  unknown_format: "未知格式: %{format}，请使用 'text' 或 'json'"
+  serialize_error: "序列化输出出错: %{e}"
+
+human:
+  invalid_scroll_speed: "无效的滚动速度 '%{speed}'，请使用 slow/normal/fast"
+
+browser:
+  config_error: "浏览器配置错误: %{e}"
+  cookie_param_error: "构建 Cookie 参数失败: %{e}"
+
+login_image:
+  timeout: "等待登录图片超时 (%{timeout:?})"
+  save_failed: "保存登录图片失败: %{e}"
+  could_not_auto_open: "无法自动打开: %{e}，请手动打开文件。"
+
+utils:
+  timeout: "超时，等待时间: %{duration:?}"
+  expected_data_url: "预期 data URL，实际得到: %{prefix}.."
+  invalid_data_url: "无效的 data URL 格式"
+  base64_error: "Base64 解码错误: %{e}"
+  open_file_failed: "打开文件失败: %{e}"
+
+extractor:
+  initial_state_null: "window.__INITIAL_STATE__ 为 null"

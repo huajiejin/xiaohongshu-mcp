@@ -1,3 +1,4 @@
+use crate::t;
 use anyhow::Result;
 use chromiumoxide::page::Page;
 
@@ -14,7 +15,7 @@ pub async fn extract_initial_state(page: &Page) -> Result<serde_json::Value> {
         .into_value::<serde_json::Value>()?;
 
     if value.is_null() {
-        anyhow::bail!("window.__INITIAL_STATE__ is null");
+        anyhow::bail!("{}", t!("extractor.initial_state_null"));
     }
 
     Ok(value)

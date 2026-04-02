@@ -1,6 +1,7 @@
 use crate::browser::{self, BrowserOptions};
 use crate::cookies;
 use crate::login_image;
+use crate::t;
 use anyhow::Result;
 use chromiumoxide::page::Page;
 use serde::Serialize;
@@ -18,7 +19,7 @@ pub struct LoginResult {
 
 impl fmt::Display for LoginResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Logged in")
+        write!(f, "{}", t!("auth.logged_in"))
     }
 }
 
@@ -30,9 +31,9 @@ pub struct StatusResult {
 impl fmt::Display for StatusResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.logged_in {
-            write!(f, "Logged in")
+            write!(f, "{}", t!("auth.logged_in"))
         } else {
-            write!(f, "Not logged in")
+            write!(f, "{}", t!("auth.not_logged_in"))
         }
     }
 }
@@ -44,7 +45,7 @@ pub struct LogoutResult {
 
 impl fmt::Display for LogoutResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Logged out")
+        write!(f, "{}", t!("auth.logged_out"))
     }
 }
 
@@ -62,10 +63,10 @@ pub async fn login(opts: &BrowserOptions) -> Result<LoginResult> {
     }
 
     if let Err(e) = login_image::fetch_and_open(&page).await {
-        warn!("Could not open login image: {e}");
-        info!("Please scan the QR code in the browser window...");
+        warn!("{}", t!("auth.could_not_open_image", e = e.to_string()));
+        info!("{}", t!("auth.scan_qr_browser"));
     } else {
-        info!("\nPlease scan the QR code above to login.\n");
+        info!("{}", t!("auth.scan_qr_image"));
     }
 
     loop {
@@ -81,7 +82,7 @@ pub async fn login(opts: &BrowserOptions) -> Result<LoginResult> {
             }
             Ok(false) => continue,
             Err(e) => {
-                warn!("Error checking login status: {}", e);
+                warn!("{}", t!("auth.error_checking_status", e = e.to_string()));
                 continue;
             }
         }

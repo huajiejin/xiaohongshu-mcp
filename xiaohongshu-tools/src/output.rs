@@ -1,3 +1,4 @@
+use crate::t;
 use serde::Serialize;
 use std::fmt::Display;
 
@@ -15,7 +16,7 @@ impl std::str::FromStr for Format {
         match s.to_lowercase().as_str() {
             "text" => Ok(Self::Text),
             "json" => Ok(Self::Json),
-            _ => anyhow::bail!("unknown format: {s}, expected 'text' or 'json'"),
+            _ => anyhow::bail!("{}", t!("output.unknown_format", format = s)),
         }
     }
 }
@@ -34,7 +35,7 @@ impl Output {
             Format::Text => println!("{value}"),
             Format::Json => match serde_json::to_string(value) {
                 Ok(json) => println!("{json}"),
-                Err(e) => eprintln!("error serializing output: {e}"),
+                Err(e) => eprintln!("{}", t!("output.serialize_error", e = e.to_string())),
             },
         }
     }

@@ -1,3 +1,4 @@
+use crate::t;
 use anyhow::Result;
 use chromiumoxide::element::Element;
 use chromiumoxide::page::Page;
@@ -70,7 +71,7 @@ impl std::str::FromStr for ScrollSpeed {
             "slow" => Ok(Self::Slow),
             "normal" => Ok(Self::Normal),
             "fast" => Ok(Self::Fast),
-            _ => anyhow::bail!("invalid scroll speed '{}', expected slow/normal/fast", s),
+            _ => anyhow::bail!("{}", t!("human.invalid_scroll_speed", speed = s)),
         }
     }
 }
