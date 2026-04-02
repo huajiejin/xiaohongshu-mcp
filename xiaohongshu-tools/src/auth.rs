@@ -91,6 +91,23 @@ pub async fn login(opts: &BrowserOptions) -> Result<LoginResult> {
     Ok(LoginResult { logged_in: true })
 }
 
+pub async fn logout(opts: &BrowserOptions) -> Result<LogoutResult> {
+    cookies::delete_cookies()?;
+
+    let headless_opts = BrowserOptions {
+        headless: true,
+        proxy: opts.proxy.clone(),
+    };
+    let browser = browser::create_browser(&headless_opts).await?;
+    let page = browser.new_page("about:blank").await?;
+    page.enable_stealth_mode().await?;
+    page.goto(XHS_URL).await?;
+    browser::clear_browser_cookies(&page).await?;
+
+    debug!("Logout complete");
+    Ok(LogoutResult { logged_out: true })
+}
+
 pub async fn check_status(opts: &BrowserOptions) -> Result<StatusResult> {
     if !cookies::cookies_exist() {
         return Ok(StatusResult { logged_in: false });

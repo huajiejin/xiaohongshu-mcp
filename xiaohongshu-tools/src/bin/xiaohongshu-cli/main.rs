@@ -2,7 +2,6 @@ use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 use xiaohongshu_tools::commands::browse;
-use xiaohongshu_tools::cookies;
 use xiaohongshu_tools::human::ScrollSpeed;
 use xiaohongshu_tools::i18n;
 use xiaohongshu_tools::output::{Format, Output};
@@ -131,8 +130,8 @@ async fn main() -> anyhow::Result<()> {
                 out.result(&result);
             }
             AuthCommands::Logout => {
-                cookies::delete_cookies()?;
-                out.result(&auth::LogoutResult { logged_out: true });
+                let result = auth::logout(&opts).await?;
+                out.result(&result);
             }
             AuthCommands::Status => {
                 let result = auth::check_status(&opts).await?;

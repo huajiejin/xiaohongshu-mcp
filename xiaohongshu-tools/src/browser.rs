@@ -2,7 +2,9 @@ use crate::cookies::{self, Cookie};
 use crate::t;
 use anyhow::{Result, anyhow};
 use chromiumoxide::browser::{Browser, BrowserConfig};
-use chromiumoxide::cdp::browser_protocol::network::{CookieParam, SetCookiesParams};
+use chromiumoxide::cdp::browser_protocol::network::{
+    ClearBrowserCookiesParams, CookieParam, SetCookiesParams,
+};
 use chromiumoxide::page::Page;
 use futures::StreamExt;
 use rand::Rng;
@@ -125,6 +127,12 @@ pub async fn create_page_with_cookies(browser: &Browser, url: &str) -> Result<Pa
     page.goto(url).await?;
 
     Ok(page)
+}
+
+pub async fn clear_browser_cookies(page: &Page) -> Result<()> {
+    page.execute(ClearBrowserCookiesParams::default()).await?;
+    debug!("Browser cookies cleared");
+    Ok(())
 }
 
 pub async fn extract_cookies(page: &Page) -> Result<Vec<Cookie>> {
