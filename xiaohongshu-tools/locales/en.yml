@@ -15,6 +15,13 @@ cli:
   auth_logout_about: "Delete saved cookies"
   auth_status_about: "Check current login status"
   explore_about: "Explore the Xiaohongshu discover feed"
+  search_about: "Search Xiaohongshu posts"
+  query_help: "Search keyword"
+  sort_by_help: "Sort by: general, latest, most_liked, most_commented, most_collected"
+  note_type_help: "Note type: all, video, image_text"
+  publish_time_help: "Publish time: all, one_day, one_week, half_year"
+  search_scope_help: "Search scope: all, viewed, not_viewed, followed"
+  location_help: "Location: all, same_city, nearby"
 
 auth:
   logged_in: "Logged in"
@@ -55,6 +62,23 @@ utils:
   invalid_data_url: "Invalid data URL format"
   base64_error: "Base64 decode error: %{e}"
   open_file_failed: "Failed to open file: %{e}"
+  api_response_timeout: "Timed out waiting for API response matching '%{url}' (%{timeout})"
 
 extractor:
   initial_state_null: "window.__INITIAL_STATE__ is null"
+
+search:
+  about: "Search Xiaohongshu posts"
+  matched_posts: "Search '%{query}': matched %{count} posts in %{time}s"
+  post_line: "%{index}. %{title} | %{author} | %{note_type} | %{id}"
+  invalid_sort_by: "invalid sort_by '%{val}', expected: general/latest/most_liked/most_commented/most_collected"
+  invalid_note_type: "invalid note_type '%{val}', expected: all/video/image_text"
+  invalid_publish_time: "invalid publish_time '%{val}', expected: all/one_day/one_week/half_year"
+  invalid_search_scope: "invalid search_scope '%{val}', expected: all/viewed/not_viewed/followed"
+  invalid_location: "invalid location '%{val}', expected: all/same_city/nearby"
+  wait_initial_state_timeout: "timed out waiting for search page to load"
+  filter_button_not_found: "search filter button not found"
+  filter_click_failed: "failed to click filter button"
+  filter_panel_timeout: "timed out waiting for filter panel"
+  filter_option_click_failed: "failed to click filter option '%{selector}': %{e}"
+  filter_option_not_found: "filter option not found: %{selector}"

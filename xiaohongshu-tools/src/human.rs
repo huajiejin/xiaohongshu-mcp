@@ -190,6 +190,24 @@ impl HumanBehavior {
         Ok(())
     }
 
+    pub async fn popup_click(
+        &mut self,
+        page: &Page,
+        anchor: &Element,
+        target: &Element,
+    ) -> Result<()> {
+        let anchor_point = anchor.clickable_point().await?;
+        page.move_mouse(anchor_point).await?;
+        self.random_delay(self.config.reaction_time.clone()).await;
+
+        target
+            .call_js_fn("function() { this.click(); }", false)
+            .await?;
+        self.random_delay(self.config.hover_time.clone()).await;
+
+        Ok(())
+    }
+
     pub async fn simulate_reading(&mut self, content_length: usize) {
         let base = self.config.read_time.start.as_millis() as u64;
         let extra = (content_length as u64 / 100).min(2000);

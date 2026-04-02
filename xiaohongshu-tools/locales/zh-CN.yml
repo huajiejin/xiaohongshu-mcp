@@ -15,6 +15,13 @@ cli:
   auth_logout_about: "删除已保存的 Cookie"
   auth_status_about: "检查当前登录状态"
   explore_about: "探索小红书发现页"
+  search_about: "搜索小红书笔记"
+  query_help: "搜索关键词"
+  sort_by_help: "排序方式: general, latest, most_liked, most_commented, most_collected"
+  note_type_help: "笔记类型: all, video, image_text"
+  publish_time_help: "发布时间: all, one_day, one_week, half_year"
+  search_scope_help: "搜索范围: all, viewed, not_viewed, followed"
+  location_help: "位置距离: all, same_city, nearby"
 
 auth:
   logged_in: "已登录"
@@ -55,6 +62,23 @@ utils:
   invalid_data_url: "无效的 data URL 格式"
   base64_error: "Base64 解码错误: %{e}"
   open_file_failed: "打开文件失败: %{e}"
+  api_response_timeout: "等待 API 响应超时 ('%{url}'，%{timeout})"
 
 extractor:
   initial_state_null: "window.__INITIAL_STATE__ 为 null"
+
+search:
+  about: "搜索小红书笔记"
+  matched_posts: "搜索 '%{query}'：匹配到 %{count} 篇笔记，用时 %{time} 秒"
+  post_line: "%{index}. %{title} | %{author} | %{note_type} | %{id}"
+  invalid_sort_by: "无效的排序方式 '%{val}'，可选: general/latest/most_liked/most_commented/most_collected"
+  invalid_note_type: "无效的笔记类型 '%{val}'，可选: all/video/image_text"
+  invalid_publish_time: "无效的发布时间 '%{val}'，可选: all/one_day/one_week/half_year"
+  invalid_search_scope: "无效的搜索范围 '%{val}'，可选: all/viewed/not_viewed/followed"
+  invalid_location: "无效的位置距离 '%{val}'，可选: all/same_city/nearby"
+  wait_initial_state_timeout: "等待搜索页面加载超时"
+  filter_button_not_found: "未找到搜索筛选按钮"
+  filter_click_failed: "点击筛选按钮失败"
+  filter_panel_timeout: "等待筛选面板超时"
+  filter_option_click_failed: "点击筛选选项 '%{selector}' 失败: %{e}"
+  filter_option_not_found: "未找到筛选选项: %{selector}"

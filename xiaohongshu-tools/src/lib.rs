@@ -80,6 +80,27 @@ pub mod i18n {
     pub fn cli_duration_help() -> String {
         t!("cli.duration_help").to_string()
     }
+    pub fn cli_search_about() -> String {
+        t!("cli.search_about").to_string()
+    }
+    pub fn cli_query_help() -> String {
+        t!("cli.query_help").to_string()
+    }
+    pub fn cli_sort_by_help() -> String {
+        t!("cli.sort_by_help").to_string()
+    }
+    pub fn cli_note_type_help() -> String {
+        t!("cli.note_type_help").to_string()
+    }
+    pub fn cli_publish_time_help() -> String {
+        t!("cli.publish_time_help").to_string()
+    }
+    pub fn cli_search_scope_help() -> String {
+        t!("cli.search_scope_help").to_string()
+    }
+    pub fn cli_location_help() -> String {
+        t!("cli.location_help").to_string()
+    }
 }
 
 pub use rust_i18n::t;

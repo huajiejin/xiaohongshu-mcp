@@ -1,6 +1,12 @@
 use crate::t;
 use anyhow::{Result, anyhow, bail};
 use base64::Engine;
+use chromiumoxide::cdp::browser_protocol::network::{
+    EnableParams as NetworkEnableParams, EventResponseReceived,
+};
+use chromiumoxide::listeners::EventStream;
+use chromiumoxide::page::Page;
+use futures::StreamExt;
 use std::path::Path;
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -60,4 +66,58 @@ pub fn open_file(path: &Path) -> Result<()> {
 
     result.map_err(|e| anyhow!("{}", t!("utils.open_file_failed", e = e.to_string())))?;
     Ok(())
+}
+
+pub struct ApiResponseWatcher {
+    events: EventStream<EventResponseReceived>,
+    url_contains: String,
+}
+
+impl ApiResponseWatcher {
+    pub async fn start(page: &Page, url_contains: &str) -> Result<Self> {
+        page.execute(NetworkEnableParams::default()).await?;
+        let events = page.event_listener::<EventResponseReceived>().await?;
+        Ok(Self {
+            events,
+            url_contains: url_contains.to_string(),
+        })
+    }
+
+    pub async fn wait(self, timeout: Duration) -> Result<()> {
+        let deadline = Instant::now() + timeout;
+        let mut events = self.events;
+        let url_contains = self.url_contains;
+
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!(
+                    "{}",
+                    t!(
+                        "utils.api_response_timeout",
+                        url = url_contains,
+                        timeout = format!("{:?}", timeout)
+                    )
+                );
+            }
+
+            match tokio::time::timeout(remaining, events.next()).await {
+                Ok(Some(event)) => {
+                    if event.response.url.contains(&url_contains) {
+                        return Ok(());
+                    }
+                }
+                Ok(None) | Err(_) => {
+                    bail!(
+                        "{}",
+                        t!(
+                            "utils.api_response_timeout",
+                            url = url_contains,
+                            timeout = format!("{:?}", timeout)
+                        )
+                    );
+                }
+            }
+        }
+    }
 }

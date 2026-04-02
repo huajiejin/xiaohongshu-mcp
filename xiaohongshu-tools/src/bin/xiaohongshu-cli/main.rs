@@ -1,7 +1,7 @@
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
-use xiaohongshu_tools::commands::explore;
+use xiaohongshu_tools::commands::{explore, search};
 use xiaohongshu_tools::human::ScrollSpeed;
 use xiaohongshu_tools::i18n;
 use xiaohongshu_tools::output::{Format, Output};
@@ -51,6 +51,34 @@ enum Commands {
         #[arg(long)]
         duration: Option<u64>,
     },
+
+    Search {
+        query: String,
+
+        #[arg(long)]
+        sort_by: Option<String>,
+
+        #[arg(long)]
+        note_type: Option<String>,
+
+        #[arg(long)]
+        publish_time: Option<String>,
+
+        #[arg(long)]
+        search_scope: Option<String>,
+
+        #[arg(long)]
+        location: Option<String>,
+
+        #[arg(long)]
+        max_posts: Option<usize>,
+
+        #[arg(long, default_value = "normal")]
+        scroll_speed: String,
+
+        #[arg(long)]
+        duration: Option<u64>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -81,6 +109,18 @@ fn build_command() -> clap::Command {
             .mut_arg("max_posts", |a| a.help(i18n::cli_max_posts_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
             .mut_arg("interact", |a| a.help(i18n::cli_interact_help()))
+            .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
+    })
+    .mut_subcommand("search", |s| {
+        s.about(i18n::cli_search_about())
+            .mut_arg("query", |a| a.help(i18n::cli_query_help()))
+            .mut_arg("sort_by", |a| a.help(i18n::cli_sort_by_help()))
+            .mut_arg("note_type", |a| a.help(i18n::cli_note_type_help()))
+            .mut_arg("publish_time", |a| a.help(i18n::cli_publish_time_help()))
+            .mut_arg("search_scope", |a| a.help(i18n::cli_search_scope_help()))
+            .mut_arg("location", |a| a.help(i18n::cli_location_help()))
+            .mut_arg("max_posts", |a| a.help(i18n::cli_max_posts_help()))
+            .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
             .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
     })
 }
@@ -154,6 +194,35 @@ async fn main() -> anyhow::Result<()> {
                     max_posts,
                     scroll_speed: speed,
                     interact,
+                    duration,
+                },
+                &opts,
+            )
+            .await?;
+            out.result(&result);
+        }
+        Commands::Search {
+            query,
+            sort_by,
+            note_type,
+            publish_time,
+            search_scope,
+            location,
+            max_posts,
+            scroll_speed,
+            duration,
+        } => {
+            let speed: ScrollSpeed = scroll_speed.parse()?;
+            let result = search::run(
+                &search::SearchOptions {
+                    query,
+                    sort_by: sort_by.map(|s| s.parse()).transpose()?,
+                    note_type: note_type.map(|s| s.parse()).transpose()?,
+                    publish_time: publish_time.map(|s| s.parse()).transpose()?,
+                    search_scope: search_scope.map(|s| s.parse()).transpose()?,
+                    location: location.map(|s| s.parse()).transpose()?,
+                    max_posts,
+                    scroll_speed: speed,
                     duration,
                 },
                 &opts,
