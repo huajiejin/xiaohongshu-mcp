@@ -6,11 +6,13 @@ use serde::Serialize;
 const EXPLORE_SECTIONS_SELECTOR: &str = "#exploreFeeds section";
 const XSEC_SOURCE_PC_FEED: &str = "pc_feed";
 const XSEC_SOURCE_PC_SEARCH: &str = "pc_search";
+const XSEC_SOURCE_PC_USER: &str = "pc_user";
 
 #[derive(Debug, Clone, Copy)]
 pub enum FeedStateRoot {
     Explore,
     Search,
+    UserProfile,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -29,8 +31,9 @@ pub struct FeedCard {
     pub publish_time: Option<String>,
     pub note_type: Option<String>,
     pub title: String,
-    pub author_name: Option<String>,
-    pub author_id: Option<String>,
+    pub creator_name: Option<String>,
+    pub creator_id: Option<String>,
+    pub creator_xsec_token: Option<String>,
     pub liked: Option<bool>,
     pub liked_count: Option<String>,
     pub collected: Option<bool>,
@@ -60,22 +63,64 @@ impl FeedCard {
         }
     }
 
+    pub fn user_profile_href(&self) -> Option<String> {
+        match (&self.id, &self.xsec_token) {
+            (Some(note_id), Some(token)) => Some(format!(
+                "/explore/{note_id}?xsec_token={token}&xsec_source={XSEC_SOURCE_PC_USER}"
+            )),
+            _ => None,
+        }
+    }
+
     pub fn href(&self, root: Option<FeedStateRoot>) -> Option<String> {
         match root {
             Some(root) => match root {
                 FeedStateRoot::Explore => self.explore_href(),
                 FeedStateRoot::Search => self.search_result_href(),
+                FeedStateRoot::UserProfile => self.user_profile_href(),
             },
             None => match &self.xsec_source {
                 Some(xsec_source) => match xsec_source.as_str() {
                     XSEC_SOURCE_PC_FEED => self.explore_href(),
                     XSEC_SOURCE_PC_SEARCH => self.search_result_href(),
+                    XSEC_SOURCE_PC_USER => self.user_profile_href(),
                     _ => None,
                 },
                 _ => None,
             },
         }
     }
+
+    pub fn creator_profile_url(&self) -> Option<String> {
+        match (&self.creator_id, &self.creator_xsec_token) {
+            (Some(user_id), Some(token)) => Some(format!(
+                "https://www.xiaohongshu.com/user/profile/{user_id}?xsec_token={token}&xsec_source=pc_feed"
+            )),
+            _ => None,
+        }
+    }
+}
+
+pub fn parse_creator_url(url: &str) -> Option<(String, String)> {
+    let path = url
+        .split_once("xiaohongshu.com")
+        .map(|(_, r)| r)
+        .unwrap_or(url);
+    let (path_part, query) = path.split_once('?').unwrap_or((path, ""));
+    let user_id = path_part
+        .trim_end_matches('/')
+        .rsplit('/')
+        .next()?
+        .to_string();
+    let mut xsec_token = String::new();
+    for part in query.split('&') {
+        if let Some((k, v)) = part.split_once('=')
+            && k == "xsec_token"
+        {
+            xsec_token = v.to_string();
+        }
+    }
+    Some((user_id, xsec_token))
 }
 
 pub async fn extract_feed_cards_with_fallback(
@@ -101,6 +146,7 @@ pub async fn extract_feed_cards_from_initial_state(
     let feeds = match root {
         FeedStateRoot::Explore => state.get("feed_feeds"),
         FeedStateRoot::Search => state.get("search_feeds"),
+        FeedStateRoot::UserProfile => state.get("user_notes"),
     };
 
     let Some(feeds) = feeds else {
@@ -150,8 +196,9 @@ pub async fn extract_feed_cards_from_dom(page: &Page) -> Result<Vec<FeedCard>> {
             publish_time: None,
             note_type: None,
             title,
-            author_name: None,
-            author_id: None,
+            creator_name: None,
+            creator_id: None,
+            creator_xsec_token: None,
             liked: None,
             liked_count: None,
             collected: None,
@@ -238,15 +285,18 @@ fn card_from_state_item(item: &serde_json::Value) -> Option<FeedCard> {
         .map(ToString::to_string);
 
     let user = note_card.get("user");
-    let author_name = user
+    let creator_name = user
         .and_then(|u| {
             u.get("nickName")
                 .and_then(|v| v.as_str())
                 .or_else(|| u.get("nickname").and_then(|v| v.as_str()))
         })
         .map(ToString::to_string);
-    let author_id = user
+    let creator_id = user
         .and_then(|u| u.get("userId").and_then(|v| v.as_str()))
+        .map(ToString::to_string);
+    let creator_xsec_token = user
+        .and_then(|u| u.get("xsecToken").and_then(|v| v.as_str()))
         .map(ToString::to_string);
 
     let interact = note_card.get("interactInfo");
@@ -291,8 +341,9 @@ fn card_from_state_item(item: &serde_json::Value) -> Option<FeedCard> {
         publish_time,
         note_type,
         title,
-        author_name,
-        author_id,
+        creator_name,
+        creator_id,
+        creator_xsec_token,
         liked,
         liked_count,
         collected,
@@ -395,13 +446,14 @@ mod tests {
     fn test_card_from_state_item_extracts_key_fields() {
         let item = json!({
             "id": "69cc5c0e000000002200d1ee",
-            "xsecToken": "token_1",
+            "xsecToken": "token_note",
             "noteCard": {
                 "type": "normal",
                 "displayTitle": "title_1",
                 "user": {
                     "nickName": "author_1",
-                    "userId": "user_1"
+                    "userId": "user_1",
+                    "xsecToken": "token_author"
                 },
                 "interactInfo": {
                     "liked": false,
@@ -422,10 +474,11 @@ mod tests {
         });
         let card = card_from_state_item(&item).expect("card");
         assert_eq!(card.id.as_deref(), Some("69cc5c0e000000002200d1ee"));
-        assert_eq!(card.xsec_token.as_deref(), Some("token_1"));
+        assert_eq!(card.xsec_token.as_deref(), Some("token_note"));
         assert_eq!(card.title, "title_1");
-        assert_eq!(card.author_name.as_deref(), Some("author_1"));
-        assert_eq!(card.author_id.as_deref(), Some("user_1"));
+        assert_eq!(card.creator_name.as_deref(), Some("author_1"));
+        assert_eq!(card.creator_id.as_deref(), Some("user_1"));
+        assert_eq!(card.creator_xsec_token.as_deref(), Some("token_author"));
         assert_eq!(card.liked, Some(false));
         assert_eq!(card.liked_count.as_deref(), Some("7"));
         assert_eq!(card.comment_count.as_deref(), Some("3"));
@@ -433,5 +486,48 @@ mod tests {
         assert_eq!(card.collected_count.as_deref(), Some("6"));
         assert_eq!(card.cover_url.as_deref(), Some("http://cover_1"));
         assert_eq!(card.video_duration_secs, Some(346));
+    }
+
+    #[test]
+    fn test_creator_profile_url() {
+        let card = FeedCard {
+            id: Some("note1".to_string()),
+            xsec_token: Some("note_tok".to_string()),
+            xsec_source: None,
+            publish_time: None,
+            note_type: None,
+            title: "test".to_string(),
+            creator_name: Some("alice".to_string()),
+            creator_id: Some("user123".to_string()),
+            creator_xsec_token: Some("creator_tok".to_string()),
+            liked: None,
+            liked_count: None,
+            collected: None,
+            collected_count: None,
+            comment_count: None,
+            shared_count: None,
+            cover_url: None,
+            video_duration_secs: None,
+        };
+        assert_eq!(
+            card.creator_profile_url(),
+            Some("https://www.xiaohongshu.com/user/profile/user123?xsec_token=creator_tok&xsec_source=pc_feed".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_creator_url() {
+        let url = "https://www.xiaohongshu.com/user/profile/63be318800000000270292d1?xsec_token=ABUsqD9zJZDrpBRj0vEgZ9lwORpvS2c3RJj5QNg6MlejI=&xsec_source=pc_feed";
+        let (uid, token) = parse_creator_url(url).unwrap();
+        assert_eq!(uid, "63be318800000000270292d1");
+        assert_eq!(token, "ABUsqD9zJZDrpBRj0vEgZ9lwORpvS2c3RJj5QNg6MlejI=");
+    }
+
+    #[test]
+    fn test_parse_creator_url_no_query() {
+        let (uid, token) =
+            parse_creator_url("https://www.xiaohongshu.com/user/profile/abc123").unwrap();
+        assert_eq!(uid, "abc123");
+        assert_eq!(token, "");
     }
 }

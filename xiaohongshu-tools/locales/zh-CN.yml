@@ -22,6 +22,8 @@ cli:
   publish_time_help: "发布时间: all, one_day, one_week, half_year"
   search_scope_help: "搜索范围: all, viewed, not_viewed, followed"
   location_help: "位置距离: all, same_city, nearby"
+  creator_about: "探索创作者主页及其笔记。传入 'xhs explore' 或 'xhs search' 输出中的 profile URL。"
+  url_help: "创作者主页 URL — 从 explore/search 的 profile 字段复制"
 
 auth:
   logged_in: "已登录"
@@ -33,8 +35,8 @@ auth:
   error_checking_status: "检查登录状态出错: %{e}"
 
 explore:
-  matched_posts: "匹配到 %{count} 篇笔记，用时 %{time} 秒"
-  post_line: "%{index}. %{title} | %{href}"
+  matched_posts: "匹配到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
+  post_line: "%{index}. %{title} | 创作者: %{creator} | 创作者ID: %{creator_id} | 主页: %{profile_url}"
   not_logged_in_warn: "未登录，内容可能受限。请先运行 'xhs auth login'。"
   explore_post_failed: "探索笔记失败: %{e}"
   click_post_failed: "点击笔记失败: %{e}"
@@ -69,8 +71,8 @@ extractor:
 
 search:
   about: "搜索小红书笔记"
-  matched_posts: "搜索 '%{query}'：匹配到 %{count} 篇笔记，用时 %{time} 秒"
-  post_line: "%{index}. %{title} | %{author} | %{note_type} | %{id}"
+  matched_posts: "搜索 '%{query}'：匹配到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
+  post_line: "%{index}. %{title} | %{creator} | 创作者ID: %{creator_id} | %{note_type} | 主页: %{profile_url}"
   invalid_sort_by: "无效的排序方式 '%{val}'，可选: general/latest/most_liked/most_commented/most_collected"
   invalid_note_type: "无效的笔记类型 '%{val}'，可选: all/video/image_text"
   invalid_publish_time: "无效的发布时间 '%{val}'，可选: all/one_day/one_week/half_year"
@@ -82,3 +84,9 @@ search:
   filter_panel_timeout: "等待筛选面板超时"
   filter_option_click_failed: "点击筛选选项 '%{selector}' 失败: %{e}"
   filter_option_not_found: "未找到筛选选项: %{selector}"
+
+creator:
+  matched_posts: "创作者 %{user_id}：收集到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
+  post_line: "%{index}. %{title} | %{note_type} | %{id}"
+  wait_initial_state_timeout: "等待创作者主页加载超时"
+  invalid_url: "无效的创作者主页 URL — 格式: https://www.xiaohongshu.com/user/profile/<user_id>?xsec_token=..."

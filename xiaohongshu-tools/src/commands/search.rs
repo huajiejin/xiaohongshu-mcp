@@ -218,6 +218,8 @@ pub struct SearchResult {
     pub total: usize,
     pub posts: Vec<PostItem>,
     pub duration_secs: u64,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub collected_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl fmt::Display for SearchResult {
@@ -229,13 +231,18 @@ impl fmt::Display for SearchResult {
                 "search.matched_posts",
                 query = &self.query,
                 count = self.total,
-                time = self.duration_secs
+                time = self.duration_secs,
+                collected_at = &self.collected_at,
             )
         )?;
         for (i, post) in self.posts.iter().enumerate() {
             let id = post.id.as_deref().unwrap_or("");
-            let author = post.author_name.as_deref().unwrap_or("-");
+            let creator = post.creator_name.as_deref().unwrap_or("-");
+            let creator_id = post.creator_id.as_deref().unwrap_or("-");
             let note_type = post.note_type.as_deref().unwrap_or("-");
+            let profile_url = post
+                .creator_profile_url()
+                .unwrap_or_else(|| "-".to_string());
             writeln!(
                 f,
                 "  {}",
@@ -243,9 +250,11 @@ impl fmt::Display for SearchResult {
                     "search.post_line",
                     index = i + 1,
                     title = &post.title,
-                    author = author,
+                    creator = creator,
+                    creator_id = creator_id,
                     note_type = note_type,
                     id = id,
+                    profile_url = profile_url.as_str(),
                 )
             )?;
         }
@@ -334,6 +343,7 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
         total,
         posts,
         duration_secs,
+        collected_at: chrono::Utc::now(),
     })
 }
 

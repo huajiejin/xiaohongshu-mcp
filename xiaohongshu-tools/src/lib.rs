@@ -101,6 +101,12 @@ pub mod i18n {
     pub fn cli_location_help() -> String {
         t!("cli.location_help").to_string()
     }
+    pub fn cli_creator_about() -> String {
+        t!("cli.creator_about").to_string()
+    }
+    pub fn cli_url_help() -> String {
+        t!("cli.url_help").to_string()
+    }
 }
 
 pub use rust_i18n::t;

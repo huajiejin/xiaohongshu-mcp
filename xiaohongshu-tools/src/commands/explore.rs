@@ -27,6 +27,8 @@ pub struct ExploreResult {
     pub total: usize,
     pub posts: Vec<PostItem>,
     pub duration_secs: u64,
+    #[serde(with = "chrono::serde::ts_seconds")]
+    pub collected_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl fmt::Display for ExploreResult {
@@ -37,12 +39,19 @@ impl fmt::Display for ExploreResult {
             t!(
                 "explore.matched_posts",
                 count = self.total,
-                time = self.duration_secs
+                time = self.duration_secs,
+                collected_at = self
+                    .collected_at
+                    .with_timezone(&chrono::Local)
+                    .format("%Y-%m-%d %H:%M:%S"),
             )
         )?;
         for (i, post) in self.posts.iter().enumerate() {
-            let id = post.id.as_deref().unwrap_or("");
-            let xsec_token = post.xsec_token.as_deref().unwrap_or("");
+            let creator = post.creator_name.as_deref().unwrap_or("-");
+            let creator_id = post.creator_id.as_deref().unwrap_or("-");
+            let profile_url = post
+                .creator_profile_url()
+                .unwrap_or_else(|| "-".to_string());
             writeln!(
                 f,
                 "  {}",
@@ -50,8 +59,9 @@ impl fmt::Display for ExploreResult {
                     "explore.post_line",
                     index = i + 1,
                     title = &post.title,
-                    id = id,
-                    xsec_token = xsec_token,
+                    creator = creator,
+                    creator_id = creator_id,
+                    profile_url = profile_url.as_str(),
                 )
             )?;
         }
@@ -152,6 +162,7 @@ pub async fn run(opts: &ExploreOptions, browser_opts: &BrowserOptions) -> Result
         total,
         posts,
         duration_secs,
+        collected_at: chrono::Utc::now(),
     })
 }
 

@@ -1,8 +1,8 @@
 # HANDOFF.md — xiaohongshu-tools Development Context
 
-> Last updated after completing Phase 1 + output module and best practices pass
+> Last updated after author→creator rename across all commands
 
-## New Findings (Before Refactor Work)
+### New Findings (Before Refactor Work)
 
 ### Explore/Browse and Search extraction gaps
 
@@ -157,18 +157,98 @@
 **`src/lib.rs`**
 - Exported new shared module: `pub mod feed_extract;`
 
+### Batch 11: Search Command + Creator Command + Creator Token Flow
+
+**`src/commands/search.rs`** — Search command:
+- Full search with filter support: `--sort_by`, `--note_type`, `--publish_time`, `--search_scope`, `--location`
+- Uses shared `extract_feed_cards_with_fallback(..., FeedStateRoot::Search)`
+- Filter UI interaction via hover-to-reveal panel, click selectors derived from enum-to-grid mapping
+- `ApiResponseWatcher` for reliable filter-change detection
+- `SearchResult` with `collected_at` timestamp
+
+**`src/commands/creator.rs`** — Creator command:
+- Accepts a full profile URL (e.g. `https://www.xiaohongshu.com/user/profile/<id>?xsec_token=...&xsec_source=pc_feed`)
+- Parses user_id from URL via `parse_creator_url()` for the result struct
+- Extracts user info (nickname, red_id, desc, ip_location, gender, avatar) from `__INITIAL_STATE__.user.userPageData.basicInfo`
+- Extracts interactions (followers, following, posts count) from `__INITIAL_STATE__.user.userPageData.interactions`
+- Collects posts via `FeedStateRoot::UserProfile` → `__INITIAL_STATE__.user.notes`
+- `CreatorResult` includes `user_info`, `interactions`, `posts`, `collected_at`
+
+**`src/feed_extract.rs`** — Creator token extraction:
+- Added `creator_xsec_token` field to `FeedCard` (extracted from `noteCard.user.xsecToken`)
+- Added `FeedStateRoot::UserProfile` variant → reads `user_notes` from initial state
+- Added `parse_creator_url()` — extracts `(user_id, xsec_token)` from a full profile URL
+- Added `creator_profile_url()` on `FeedCard` — builds full profile URL from `creator_id` + `creator_xsec_token`
+- Extractor JS now also extracts `user_notes` and `user_data` from `__INITIAL_STATE__`
+
+**`src/extractor.rs`** — Updated JS extraction:
+- Added `flatten()` helper for nested arrays in `user.notes`
+- Now extracts `user_notes` and `user_data` alongside `feed_feeds` and `search_feeds`
+
+**`src/commands/explore.rs`** — Display updated:
+- Post lines now show `creator`, `creator_id`, `profile` (full URL) instead of separate token fields
+- Profile URL is copy-pasteable for direct use with `xhs creator`
+
+**`src/commands/search.rs`** — Display updated:
+- Post lines now show `creator_id` and `profile` (full URL) for creator exploration
+
+**`locales/en.yml` + `locales/zh-CN.yml`** — New keys:
+- `cli.creator_about`, `cli.url_help` (replaced `user_id_help`/`xsec_token_help`)
+- `creator.matched_posts`, `creator.post_line`, `creator.wait_initial_state_timeout`, `creator.invalid_url`
+- `explore.post_line` and `search.post_line` updated to show `profile: <url>` instead of `token: <xsec_token>`
+
+**`src/lib.rs`** — Updated i18n helpers:
+- Replaced `cli_user_id_help()` / `cli_xsec_token_help()` with `cli_url_help()`
+
+**`Cargo.toml`** — Added `chrono` with serde feature for timestamp serialization
+
+### Batch 12: author → creator rename
+
+Renamed all `author` references to `creator` across the entire codebase:
+
+**`src/feed_extract.rs`:**
+- `FeedCard` fields: `author_name` → `creator_name`, `author_id` → `creator_id`, `author_xsec_token` → `creator_xsec_token`
+- Method: `author_profile_url()` → `creator_profile_url()`
+- Function: `parse_profile_url()` → `parse_creator_url()`
+- All test references updated
+
+**`src/commands/creator.rs`** (renamed from `profile.rs`):
+- `ProfileOptions` → `CreatorOptions`
+- `ProfileResult` → `CreatorResult`
+- Locale keys: `profile.*` → `creator.*`
+
+**`src/commands/explore.rs`** + **`src/commands/search.rs`:**
+- Display code uses `creator`, `creator_id`, `profile_url` variable names
+
+**`src/bin/xiaohongshu-cli/main.rs`:**
+- `Commands::Profile` → `Commands::Creator`
+- Subcommand name: `"profile"` → `"creator"`
+- Import: `profile` → `creator`
+
+**`src/lib.rs`:**
+- `cli_profile_about()` → `cli_creator_about()`
+
+**`locales/en.yml`:**
+- `cli.profile_about` → `cli.creator_about`
+- `explore.post_line`: `author` → `creator`, `author_id` → `creator_id`
+- `search.post_line`: `author` → `creator`, `author_id` → `creator_id`
+- Section: `profile:` → `creator:`
+
+**`locales/zh-CN.yml`:**
+- Same structural changes, `作者` → `创作者`
+
 ### Remaining follow-up work (next session)
 
-- Reuse `src/feed_extract.rs` in upcoming `search` command (`FeedStateRoot::Search`) for shared behavior.
-- Add optional merge strategy when state data exists but misses fields (enrich from DOM instead of full fallback).
-- Design and implement `search continue` pagination token contract for agent-friendly incremental loading.
 - Add optional count normalization helpers (e.g. `1.2w` -> numeric) if downstream consumers need numeric sorting.
+- `xhs feed <note_id>` — note detail with comments
+- `xhs like <note_id>` / `xhs favorite <note_id>`
+- `xhs comment <note_id> <text>`
 
 ## Current Architecture
 
 ```
 src/
-├── lib.rs              # Module declarations
+├── lib.rs              # Module declarations + i18n helpers
 ├── auth.rs             # Login (QR scan) + check_status, returns structured results
 ├── browser.rs          # Browser launch (chromiumoxide), stealth, cookies injection, proxy, viewport
 ├── cookies.rs          # Cookie persist/load/delete (JSON file at config dir)
@@ -181,7 +261,9 @@ src/
 ├── utils.rs            # Shared utilities (polling, data URL decode, file open)
 ├── commands/
 │   ├── mod.rs
-│   └── explore.rs       # Explore discover feed with filtering and interaction
+│   ├── explore.rs       # Explore discover feed with filtering and interaction
+│   ├── search.rs        # Search with filters (sort, type, time, scope, location)
+│   └── creator.rs        # Creator profile exploration (accepts profile URL)
 └── bin/
     └── xiaohongshu-cli/
         └── main.rs     # CLI entry point (clap), --format, --headless, --proxy
@@ -205,23 +287,34 @@ xhs explore --scroll_speed slow          # Scroll speed: slow, normal, fast
 xhs explore --interact                   # Click into posts and scroll comments
 xhs explore --duration 300               # Auto-exit after 5 minutes
 
+xhs search "keyword"                     # Search posts
+xhs search "keyword" --sort_by latest    # Sort: general, latest, most_liked, most_commented, most_collected
+xhs search "keyword" --note_type video   # Type: all, video, image_text
+xhs search "keyword" --max_posts 20      # Limit results
+
+xhs creator "https://www.xiaohongshu.com/user/profile/<user_id>?xsec_token=<token>&xsec_source=pc_feed"
+xhs creator "<url>" --max_posts 10       # Limit creator posts
+xhs creator "<url>" --duration 60        # Time-limited collection
+
 xhs --format json auth status           # JSON output for agents
 xhs --format json explore --max_posts 5  # JSON explore results
+xhs --format json search "cats"          # JSON search results
+xhs --format json creator "<url>"        # JSON creator results
 ```
 
 ## What's Next (PLAN.md Reference)
 
-### Phase 2: Core Features
+### Phase 2: Core Features (in progress)
 
 Implement feature parity with the competitor:
-- `xhs search <query>` — search with filters
+- ~~`xhs search <query>` — search with filters~~ (done)
+- ~~`xhs explore` — browse homepage feed~~ (done)
+- ~~`xhs creator <url>` — creator profile~~ (done, accepts profile URL)
 - `xhs feed <note_id>` — note detail with comments
-- `xhs explore` — browse homepage feed (done via `explore` command)
-- `xhs profile <user_id>` — user profile
 - `xhs like <note_id>` / `xhs favorite <note_id>`
 - `xhs comment <note_id> <text>`
 
-All will use `src/extractor.rs` for reading `window.__INITIAL_STATE__` via JS eval.
+All use `src/extractor.rs` for reading `window.__INITIAL_STATE__` via JS eval.
 
 ### Phase 3: Competitive Edge
 
@@ -245,6 +338,7 @@ All will use `src/extractor.rs` for reading `window.__INITIAL_STATE__` via JS ev
 ```toml
 anyhow = "1.0.102"           # Error handling
 chromiumoxide = "0.9.1"      # CDP browser automation
+chrono = { version = "0.4", features = ["serde"] }  # Timestamps
 clap = { version = "4.6.0", features = ["derive"] }  # CLI
 dirs = "6.0.0"               # Config directory
 futures = "0.3.32"           # Stream handling for CDP handler
@@ -263,7 +357,8 @@ base64 = "0.22"              # Data URL decoding for login image
 ```bash
 cd xiaohongshu-tools
 cargo build          # Build
-cargo test           # Run tests (retry module has 3 tests)
+cargo test           # Run tests (retry: 3, feed_extract: 7)
+cargo fmt            # Format
 cargo run -- --help  # CLI help
 RUST_LOG=debug cargo run -- auth status  # Debug logging
 ```
