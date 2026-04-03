@@ -1,7 +1,9 @@
+use crate::shared::parse::{parse_count, parse_publish_time};
 use crate::t;
 use anyhow::Result;
 use chromiumoxide::page::Page;
 use serde::Serialize;
+use std::fmt;
 
 const XHS_DOMAIN: &str = "https://www.xiaohongshu.com";
 const EXPLORE_SECTIONS_SELECTOR: &str = "#exploreFeeds section";
@@ -92,6 +94,293 @@ impl NoteCard {
             _ => None,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Note {
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xsec_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xsec_source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub publish_time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note_type: Option<String>,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator_profile_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub liked: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub liked_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub collected: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub collected_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shared_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video_duration_secs: Option<u64>,
+}
+
+impl Note {
+    pub fn from_card(
+        card: &NoteCard,
+        xsec_source: Option<&str>,
+        collected_at: chrono::DateTime<chrono::Local>,
+    ) -> Self {
+        Self {
+            id: card.id.clone(),
+            xsec_token: card.xsec_token.clone(),
+            xsec_source: card.xsec_source.clone(),
+            publish_time: card
+                .publish_time
+                .as_deref()
+                .and_then(|raw| parse_publish_time(raw, collected_at))
+                .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S").to_string()),
+            note_type: card.note_type.clone(),
+            title: card.title.clone(),
+            note_url: card.note_url(xsec_source),
+            creator_name: card.creator_name.clone(),
+            creator_id: card.creator_id.clone(),
+            creator_profile_url: card.creator_profile_url(),
+            liked: card.liked,
+            liked_count: card.liked_count.as_deref().and_then(parse_count),
+            collected: card.collected,
+            collected_count: card.collected_count.as_deref().and_then(parse_count),
+            comment_count: card.comment_count.as_deref().and_then(parse_count),
+            shared_count: card.shared_count.as_deref().and_then(parse_count),
+            cover_url: card.cover_url.clone(),
+            video_duration_secs: card.video_duration_secs,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CreatorInteraction {
+    pub kind: String,
+    pub name: String,
+    pub count: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CreatorInfo {
+    pub user_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nickname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub red_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub desc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ip_location: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gender: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub interactions: Vec<CreatorInteraction>,
+}
+
+impl fmt::Display for CreatorInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let nickname = self.nickname.as_deref().unwrap_or("-");
+        let red_id = self.red_id.as_deref().unwrap_or("-");
+        write!(f, "{nickname} (@{red_id})")?;
+        if let Some(desc) = &self.desc
+            && !desc.is_empty()
+        {
+            write!(f, " — {desc}")?;
+        }
+        if let Some(ip) = &self.ip_location
+            && !ip.is_empty()
+        {
+            write!(f, " [{ip}]")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize)]
+pub struct CollectionResult {
+    pub total: usize,
+    pub notes: Vec<Note>,
+    pub duration_secs: u64,
+    pub collected_at: String,
+}
+
+impl fmt::Display for CollectionResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "{}",
+            t!(
+                "collection.matched_notes",
+                count = self.total,
+                time = self.duration_secs,
+                collected_at = &self.collected_at,
+            )
+        )?;
+        for (i, note) in self.notes.iter().enumerate() {
+            let creator = note.creator_name.as_deref().unwrap_or("-");
+            let creator_id = note.creator_id.as_deref().unwrap_or("-");
+            let profile_url = note.creator_profile_url.as_deref().unwrap_or("-");
+            writeln!(
+                f,
+                "  {}",
+                t!(
+                    "collection.note_line",
+                    index = i + 1,
+                    title = &note.title,
+                    creator = creator,
+                    creator_id = creator_id,
+                    profile_url = profile_url,
+                )
+            )?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize)]
+pub struct CreatorCollectionResult {
+    pub creator: CreatorInfo,
+    pub total: usize,
+    pub notes: Vec<Note>,
+    pub duration_secs: u64,
+    pub collected_at: String,
+}
+
+impl fmt::Display for CreatorCollectionResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "{}", self.creator)?;
+
+        if !self.creator.interactions.is_empty() {
+            let parts: Vec<String> = self
+                .creator
+                .interactions
+                .iter()
+                .map(|i| format!("{}: {}", i.name, i.count))
+                .collect();
+            writeln!(f, "{}", parts.join(" | "))?;
+        }
+
+        writeln!(
+            f,
+            "{}",
+            t!(
+                "creator.matched_notes",
+                user_id = &self.creator.user_id,
+                count = self.total,
+                time = self.duration_secs,
+                collected_at = &self.collected_at,
+            )
+        )?;
+        for (i, note) in self.notes.iter().enumerate() {
+            let note_type = note.note_type.as_deref().unwrap_or("-");
+            let id = note.id.as_deref().unwrap_or("");
+            writeln!(
+                f,
+                "  {}",
+                t!(
+                    "creator.note_line",
+                    index = i + 1,
+                    title = &note.title,
+                    note_type = note_type,
+                    id = id,
+                )
+            )?;
+        }
+        Ok(())
+    }
+}
+
+pub fn parse_user_info(state: &serde_json::Value, user_id: String) -> Option<CreatorInfo> {
+    let data = state.get("user_data")?;
+    let basic = data.get("basicInfo")?;
+
+    let gender_num = basic.get("gender").and_then(|v| v.as_i64());
+    let gender = gender_num.map(|g| match g {
+        0 => "male".to_string(),
+        1 => "female".to_string(),
+        _ => "unknown".to_string(),
+    });
+
+    Some(CreatorInfo {
+        user_id,
+        nickname: basic
+            .get("nickname")
+            .and_then(|v| v.as_str())
+            .map(ToString::to_string),
+        red_id: basic
+            .get("redId")
+            .and_then(|v| v.as_str())
+            .map(ToString::to_string),
+        desc: basic
+            .get("desc")
+            .and_then(|v| v.as_str())
+            .map(ToString::to_string),
+        ip_location: basic
+            .get("ipLocation")
+            .and_then(|v| v.as_str())
+            .map(ToString::to_string),
+        gender,
+        avatar: basic
+            .get("imageb")
+            .and_then(|v| v.as_str())
+            .or_else(|| basic.get("images").and_then(|v| v.as_str()))
+            .map(ToString::to_string),
+        interactions: parse_interactions(state),
+    })
+}
+
+pub fn parse_interactions(state: &serde_json::Value) -> Vec<CreatorInteraction> {
+    let data = match state.get("user_data") {
+        Some(d) => d,
+        None => return Vec::new(),
+    };
+
+    let arr = match data.get("interactions").and_then(|v| v.as_array()) {
+        Some(a) => a,
+        None => return Vec::new(),
+    };
+
+    arr.iter()
+        .filter_map(|item| {
+            let kind = item
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let name = item
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            let count = item
+                .get("count")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+
+            if kind.is_empty() {
+                None
+            } else {
+                Some(CreatorInteraction { kind, name, count })
+            }
+        })
+        .collect()
 }
 
 pub fn parse_creator_link(link: &str) -> Option<(String, String)> {
@@ -384,6 +673,7 @@ fn value_to_text(value: &serde_json::Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
     use serde_json::json;
 
     #[test]
@@ -544,5 +834,60 @@ mod tests {
             parse_creator_link("https://www.xiaohongshu.com/user/profile/abc123").unwrap();
         assert_eq!(uid, "abc123");
         assert_eq!(token, "");
+    }
+
+    #[test]
+    fn test_note_from_card_normalizes_counts() {
+        let card = NoteCard {
+            id: Some("note1".to_string()),
+            xsec_token: Some("tok".to_string()),
+            xsec_source: Some("pc_search".to_string()),
+            title: "test note".to_string(),
+            creator_name: Some("alice".to_string()),
+            creator_id: Some("user1".to_string()),
+            creator_xsec_token: Some("ctok".to_string()),
+            liked_count: Some("1,430".to_string()),
+            collected_count: Some("1.2万".to_string()),
+            comment_count: Some("42".to_string()),
+            shared_count: Some("3k".to_string()),
+            publish_time: Some("2天前".to_string()),
+            ..Default::default()
+        };
+
+        let ref_time = chrono::Local
+            .with_ymd_and_hms(2026, 4, 3, 12, 0, 0)
+            .single()
+            .unwrap();
+        let note = Note::from_card(&card, None, ref_time);
+
+        assert_eq!(note.id, Some("note1".to_string()));
+        assert_eq!(note.liked_count, Some(1430));
+        assert_eq!(note.collected_count, Some(12000));
+        assert_eq!(note.comment_count, Some(42));
+        assert_eq!(note.shared_count, Some(3000));
+        assert!(note.publish_time.is_some());
+        assert!(note.note_url.is_some());
+        assert!(note.creator_profile_url.is_some());
+    }
+
+    #[test]
+    fn test_note_from_card_skips_none_fields_in_json() {
+        let card = NoteCard {
+            id: Some("note1".to_string()),
+            xsec_token: None,
+            xsec_source: None,
+            title: "minimal".to_string(),
+            ..Default::default()
+        };
+
+        let ref_time = chrono::Local::now();
+        let note = Note::from_card(&card, None, ref_time);
+        let json = serde_json::to_value(&note).unwrap();
+
+        assert!(json.get("xsec_token").is_none());
+        assert!(json.get("liked_count").is_none());
+        assert!(json.get("creator_name").is_none());
+        assert_eq!(json["id"].as_str(), Some("note1"));
+        assert_eq!(json["title"].as_str(), Some("minimal"));
     }
 }

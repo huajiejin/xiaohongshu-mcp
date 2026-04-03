@@ -1,13 +1,13 @@
 use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
-use crate::extract::note::{ExtractionRoot, NoteCard, extract_note_cards_with_fallback};
+use crate::extract::note::{
+    CollectionResult, ExtractionRoot, Note, NoteCard, extract_note_cards_with_fallback,
+};
 use crate::shared::utils::ApiResponseWatcher;
 use crate::t;
 use anyhow::{Result, anyhow};
 use chromiumoxide::page::Page;
-use serde::Serialize;
 use std::collections::HashSet;
-use std::fmt;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
 use tracing::{debug, warn};
@@ -210,56 +210,6 @@ impl ToFilterClick for Location {
     }
 }
 
-#[derive(Serialize)]
-pub struct SearchResult {
-    pub query: String,
-    pub total: usize,
-    pub notes: Vec<NoteCard>,
-    pub duration_secs: u64,
-    #[serde(with = "chrono::serde::ts_seconds")]
-    pub collected_at: chrono::DateTime<chrono::Utc>,
-}
-
-impl fmt::Display for SearchResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "{}",
-            t!(
-                "search.matched_notes",
-                query = &self.query,
-                count = self.total,
-                time = self.duration_secs,
-                collected_at = &self.collected_at,
-            )
-        )?;
-        for (i, note) in self.notes.iter().enumerate() {
-            let id = note.id.as_deref().unwrap_or("");
-            let creator = note.creator_name.as_deref().unwrap_or("-");
-            let creator_id = note.creator_id.as_deref().unwrap_or("-");
-            let note_type = note.note_type.as_deref().unwrap_or("-");
-            let profile_url = note
-                .creator_profile_url()
-                .unwrap_or_else(|| "-".to_string());
-            writeln!(
-                f,
-                "  {}",
-                t!(
-                    "search.note_line",
-                    index = i + 1,
-                    title = &note.title,
-                    creator = creator,
-                    creator_id = creator_id,
-                    note_type = note_type,
-                    id = id,
-                    profile_url = profile_url.as_str(),
-                )
-            )?;
-        }
-        Ok(())
-    }
-}
-
 pub struct SearchOptions {
     pub query: String,
     pub sort_by: Option<SortBy>,
@@ -272,7 +222,7 @@ pub struct SearchOptions {
     pub duration: Option<u64>,
 }
 
-pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<SearchResult> {
+pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<CollectionResult> {
     let url = SEARCH_URL_TEMPLATE.replace("{keyword}", &urlencoding::encode(&opts.query));
 
     let browser = browser::create_browser(browser_opts).await?;
@@ -292,15 +242,15 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
         apply_filters(&page, opts, &mut human).await?;
     }
     let mut seen_keys: HashSet<String> = HashSet::new();
-    let mut notes: Vec<NoteCard> = Vec::new();
+    let mut cards: Vec<NoteCard> = Vec::new();
     let start = Instant::now();
 
     loop {
-        if should_stop(opts, notes.len(), start) {
+        if should_stop(opts, cards.len(), start) {
             break;
         }
 
-        let cards = match extract_note_cards_with_fallback(&page, ExtractionRoot::Search).await {
+        let batch = match extract_note_cards_with_fallback(&page, ExtractionRoot::Search).await {
             Ok(v) => v,
             Err(_) => {
                 human.random_delay(human.config.human_delay.clone()).await;
@@ -308,7 +258,7 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
             }
         };
 
-        for card in cards {
+        for card in batch {
             let key = card_unique_key(&card);
             if seen_keys.contains(&key) {
                 continue;
@@ -316,15 +266,15 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
             seen_keys.insert(key);
 
             let id = card.id.clone().unwrap_or_default();
-            debug!("[{}] {} | {}", notes.len() + 1, card.title, id);
-            notes.push(card);
+            debug!("[{}] {} | {}", cards.len() + 1, card.title, id);
+            cards.push(card);
 
-            if should_stop(opts, notes.len(), start) {
+            if should_stop(opts, cards.len(), start) {
                 break;
             }
         }
 
-        if should_stop(opts, notes.len(), start) {
+        if should_stop(opts, cards.len(), start) {
             break;
         }
 
@@ -333,15 +283,19 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
     }
 
     let duration_secs = start.elapsed().as_secs();
+    let collected_at = chrono::Local::now();
+    let notes: Vec<Note> = cards
+        .iter()
+        .map(|c| Note::from_card(c, None, collected_at))
+        .collect();
     let total = notes.len();
     debug!("done: searched {} notes in {}s", total, duration_secs);
 
-    Ok(SearchResult {
-        query: opts.query.clone(),
+    Ok(CollectionResult {
         total,
         notes,
         duration_secs,
-        collected_at: chrono::Utc::now(),
+        collected_at: collected_at.to_rfc3339(),
     })
 }
 

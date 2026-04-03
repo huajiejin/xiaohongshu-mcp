@@ -34,9 +34,11 @@ auth:
   could_not_open_image: "Could not open login image: %{e}"
   error_checking_status: "Error checking login status: %{e}"
 
-explore:
+collection:
   matched_notes: "Matched %{count} notes in %{time}s (collected at %{collected_at})"
   note_line: "%{index}. %{title} | creator: %{creator} | creator_id: %{creator_id} | profile: %{profile_url}"
+
+explore:
   not_logged_in_warn: "not logged in, content may be limited. Run 'xhs auth login' first."
   explore_note_failed: "explore note failed: %{e}"
   click_note_failed: "click note failed: %{e}"
@@ -71,8 +73,6 @@ extractor:
 
 search:
   about: "Search Xiaohongshu notes"
-  matched_notes: "Search '%{query}': matched %{count} notes in %{time}s (collected at %{collected_at})"
-  note_line: "%{index}. %{title} | %{creator} | creator_id: %{creator_id} | %{note_type} | profile: %{profile_url}"
   invalid_sort_by: "invalid sort_by '%{val}', expected: general/latest/most_liked/most_commented/most_collected"
   invalid_note_type: "invalid note_type '%{val}', expected: all/video/image_text"
   invalid_publish_time: "invalid publish_time '%{val}', expected: all/one_day/one_week/half_year"
