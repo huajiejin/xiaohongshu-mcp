@@ -2,7 +2,7 @@ use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
 use crate::extract::note::extract_initial_state;
 use crate::extract::note::{
-    ExtractionRoot, NoteCard, extract_note_cards_from_initial_state, parse_creator_url,
+    ExtractionRoot, NoteCard, extract_note_cards_from_initial_state, parse_creator_link,
 };
 use crate::t;
 use anyhow::{Result, anyhow};
@@ -113,7 +113,7 @@ pub struct CreatorOptions {
 
 pub async fn run(opts: &CreatorOptions, browser_opts: &BrowserOptions) -> Result<CreatorResult> {
     let (user_id, _) =
-        parse_creator_url(&opts.url).ok_or_else(|| anyhow!("{}", t!("creator.invalid_url")))?;
+        parse_creator_link(&opts.url).ok_or_else(|| anyhow!("{}", t!("creator.invalid_url")))?;
 
     let browser = browser::create_browser(browser_opts).await?;
     let page = browser::create_page_with_cookies(&browser, &opts.url).await?;

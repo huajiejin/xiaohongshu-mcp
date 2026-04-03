@@ -169,7 +169,7 @@ async fn explore_note_by_card(
     card: &NoteCard,
     human: &mut HumanBehavior,
 ) -> Result<()> {
-    click_note(page, card, ExtractionRoot::Explore).await?;
+    click_note(page, card).await?;
 
     human.random_delay(human.config.short_read.clone()).await;
 
@@ -196,32 +196,9 @@ async fn explore_note_by_card(
     Ok(())
 }
 
-async fn click_note(page: &Page, card: &NoteCard, root: ExtractionRoot) -> Result<()> {
-    if let Some(href) = &card.href(Some(root)) {
-        let href_js = serde_json::to_string(href)?;
-        let js = format!(
-            r#"(() => {{
-                const target = {href_js};
-                const links = Array.from(document.querySelectorAll('a.cover'));
-                const found = links.find((el) => el.getAttribute('href') === target || el.href.endsWith(target));
-                if (!found) return false;
-                found.click();
-                return true;
-            }})()"#
-        );
-        let clicked = page
-            .evaluate_expression(&js)
-            .await?
-            .into_value::<serde_json::Value>()?
-            .as_bool()
-            .unwrap_or(false);
-        if clicked {
-            return Ok(());
-        }
-    }
-
+async fn click_note(page: &Page, card: &NoteCard) -> Result<()> {
     if let Some(note_id) = &card.id {
-        let selector = format!("a.cover[href*='/explore/{note_id}']");
+        let selector = format!("a.cover[href*='/{note_id}']");
         if let Ok(el) = page.find_element(&selector).await {
             el.click().await?;
             return Ok(());

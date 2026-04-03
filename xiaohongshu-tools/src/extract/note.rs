@@ -3,9 +3,12 @@ use anyhow::Result;
 use chromiumoxide::page::Page;
 use serde::Serialize;
 
+const XHS_DOMAIN: &str = "https://www.xiaohongshu.com";
 const EXPLORE_SECTIONS_SELECTOR: &str = "#exploreFeeds section";
-const XSEC_SOURCE_PC_FEED: &str = "pc_feed";
 const XSEC_SOURCE_PC_SEARCH: &str = "pc_search";
+#[allow(dead_code)]
+const XSEC_SOURCE_PC_FEED: &str = "pc_feed";
+#[allow(dead_code)]
 const XSEC_SOURCE_PC_USER: &str = "pc_user";
 
 pub async fn extract_initial_state(page: &Page) -> Result<serde_json::Value> {
@@ -41,14 +44,14 @@ pub enum ExtractionRoot {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct HrefParts {
+pub struct LinkParts {
     pub raw: String,
     pub note_id: Option<String>,
     pub xsec_token: Option<String>,
     pub xsec_source: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Default)]
 pub struct NoteCard {
     pub id: Option<String>,
     pub xsec_token: Option<String>,
@@ -70,68 +73,32 @@ pub struct NoteCard {
 }
 
 impl NoteCard {
-    pub fn explore_href(&self) -> Option<String> {
+    pub fn note_url(&self, xsec_source: Option<&str>) -> Option<String> {
+        let xsec_source = xsec_source
+            .unwrap_or_else(|| self.xsec_source.as_deref().unwrap_or(XSEC_SOURCE_PC_SEARCH));
         match (&self.id, &self.xsec_token) {
             (Some(note_id), Some(token)) => Some(format!(
-                "/explore/{note_id}?xsec_token={token}&xsec_source={XSEC_SOURCE_PC_FEED}"
+                "{XHS_DOMAIN}/explore/{note_id}?xsec_token={token}&xsec_source={xsec_source}"
             )),
             _ => None,
         }
-    }
-
-    pub fn search_result_href(&self) -> Option<String> {
-        match (&self.id, &self.xsec_token) {
-            (Some(note_id), Some(token)) => Some(format!(
-                "/search_result/{note_id}?xsec_token={token}&xsec_source={XSEC_SOURCE_PC_SEARCH}"
-            )),
-            _ => None,
-        }
-    }
-
-    pub fn user_profile_href(&self) -> Option<String> {
-        match (&self.id, &self.xsec_token) {
-            (Some(note_id), Some(token)) => Some(format!(
-                "/explore/{note_id}?xsec_token={token}&xsec_source={XSEC_SOURCE_PC_USER}"
-            )),
-            _ => None,
-        }
-    }
-
-    pub fn href(&self, root: Option<ExtractionRoot>) -> Option<String> {
-        root.map_or_else(
-            || {
-                self.xsec_source
-                    .as_ref()
-                    .and_then(|xsec_source| match xsec_source.as_str() {
-                        XSEC_SOURCE_PC_FEED => self.explore_href(),
-                        XSEC_SOURCE_PC_SEARCH => self.search_result_href(),
-                        XSEC_SOURCE_PC_USER => self.user_profile_href(),
-                        _ => None,
-                    })
-            },
-            |root| match root {
-                ExtractionRoot::Explore => self.explore_href(),
-                ExtractionRoot::Search => self.search_result_href(),
-                ExtractionRoot::UserProfile => self.user_profile_href(),
-            },
-        )
     }
 
     pub fn creator_profile_url(&self) -> Option<String> {
         match (&self.creator_id, &self.creator_xsec_token) {
             (Some(user_id), Some(token)) => Some(format!(
-                "https://www.xiaohongshu.com/user/profile/{user_id}?xsec_token={token}&xsec_source=pc_feed"
+                "{XHS_DOMAIN}/user/profile/{user_id}?xsec_token={token}&xsec_source=pc_search"
             )),
             _ => None,
         }
     }
 }
 
-pub fn parse_creator_url(url: &str) -> Option<(String, String)> {
-    let path = url
+pub fn parse_creator_link(link: &str) -> Option<(String, String)> {
+    let path = link
         .split_once("xiaohongshu.com")
         .map(|(_, r)| r)
-        .unwrap_or(url);
+        .unwrap_or(link);
     let (path_part, query) = path.split_once('?').unwrap_or((path, ""));
     let user_id = path_part
         .trim_end_matches('/')
@@ -214,36 +181,24 @@ pub async fn extract_note_cards_from_dom(page: &Page) -> Result<Vec<NoteCard>> {
             Err(_) => String::new(),
         };
 
-        let href_parts = parse_href_parts(&href_raw);
+        let link_parts = parse_link_parts(&href_raw);
 
         cards.push(NoteCard {
-            id: href_parts.note_id.clone(),
-            xsec_token: href_parts.xsec_token.clone(),
-            publish_time: None,
-            note_type: None,
+            id: link_parts.note_id.clone(),
+            xsec_token: link_parts.xsec_token.clone(),
             title,
-            creator_name: None,
-            creator_id: None,
-            creator_xsec_token: None,
-            liked: None,
-            liked_count: None,
-            collected: None,
-            collected_count: None,
-            comment_count: None,
-            shared_count: None,
-            cover_url: None,
-            video_duration_secs: None,
-            xsec_source: href_parts.xsec_source,
+            xsec_source: link_parts.xsec_source,
+            ..Default::default()
         });
     }
 
     Ok(cards)
 }
 
-pub fn parse_href_parts(raw_href: &str) -> HrefParts {
-    let (path, query) = raw_href
+pub fn parse_link_parts(raw_link: &str) -> LinkParts {
+    let (path, query) = raw_link
         .split_once('?')
-        .map_or_else(|| (raw_href.to_string(), ""), |(p, q)| (p.to_string(), q));
+        .map_or_else(|| (raw_link.to_string(), ""), |(p, q)| (p.to_string(), q));
 
     let normalized_path = if path.starts_with("http://") || path.starts_with("https://") {
         match path.split_once("xiaohongshu.com") {
@@ -276,8 +231,8 @@ pub fn parse_href_parts(raw_href: &str) -> HrefParts {
         }
     }
 
-    HrefParts {
-        raw: raw_href.to_string(),
+    LinkParts {
+        raw: raw_link.to_string(),
         note_id,
         xsec_token,
         xsec_source,
@@ -432,17 +387,17 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn test_parse_href_parts() {
+    fn test_parse_link_parts() {
         let parts =
-            parse_href_parts("/explore/69bbf98d000000001a03241b?xsec_token=abc123&xsec_source=");
+            parse_link_parts("/explore/69bbf98d000000001a03241b?xsec_token=abc123&xsec_source=");
         assert_eq!(parts.note_id.as_deref(), Some("69bbf98d000000001a03241b"));
         assert_eq!(parts.xsec_token.as_deref(), Some("abc123"));
         assert_eq!(parts.xsec_source.as_deref(), None);
     }
 
     #[test]
-    fn test_parse_href_parts_from_search_result() {
-        let parts = parse_href_parts(
+    fn test_parse_link_parts_from_search_result() {
+        let parts = parse_link_parts(
             "/search_result/03bbf95d000000001a022f45?xsec_token=iu872&xsec_source=pc_search",
         );
         assert_eq!(parts.note_id.as_deref(), Some("03bbf95d000000001a022f45"));
@@ -511,44 +466,82 @@ mod tests {
     }
 
     #[test]
-    fn test_creator_profile_url() {
+    fn test_creator_profile_link() {
         let card = NoteCard {
             id: Some("note1".to_string()),
             xsec_token: Some("note_tok".to_string()),
-            xsec_source: None,
-            publish_time: None,
-            note_type: None,
             title: "test".to_string(),
             creator_name: Some("alice".to_string()),
             creator_id: Some("user123".to_string()),
             creator_xsec_token: Some("creator_tok".to_string()),
-            liked: None,
-            liked_count: None,
-            collected: None,
-            collected_count: None,
-            comment_count: None,
-            shared_count: None,
-            cover_url: None,
-            video_duration_secs: None,
+            ..Default::default()
         };
         assert_eq!(
             card.creator_profile_url(),
-            Some("https://www.xiaohongshu.com/user/profile/user123?xsec_token=creator_tok&xsec_source=pc_feed".to_string())
+            Some("https://www.xiaohongshu.com/user/profile/user123?xsec_token=creator_tok&xsec_source=pc_search".to_string())
         );
     }
 
     #[test]
-    fn test_parse_creator_url() {
+    fn test_note_url() {
+        let card = NoteCard {
+            id: Some("note1".to_string()),
+            xsec_token: Some("tok".to_string()),
+            xsec_source: Some(XSEC_SOURCE_PC_FEED.to_string()),
+            title: "test".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(
+            card.note_url(None),
+            Some(
+                "https://www.xiaohongshu.com/explore/note1?xsec_token=tok&xsec_source=pc_feed"
+                    .to_string()
+            )
+        );
+
+        let card = NoteCard {
+            id: Some("note1".to_string()),
+            xsec_token: Some("tok".to_string()),
+            xsec_source: None,
+            title: "test".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(
+            card.note_url(None),
+            Some(
+                "https://www.xiaohongshu.com/explore/note1?xsec_token=tok&xsec_source=pc_search"
+                    .to_string()
+            )
+        );
+
+        let card = NoteCard {
+            id: Some("note1".to_string()),
+            xsec_token: Some("tok".to_string()),
+            xsec_source: Some(XSEC_SOURCE_PC_FEED.to_string()),
+            title: "test".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(
+            card.note_url(Some(XSEC_SOURCE_PC_USER)),
+            Some(
+                "https://www.xiaohongshu.com/explore/note1?xsec_token=tok&xsec_source=pc_user"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn test_parse_creator_link() {
         let url = "https://www.xiaohongshu.com/user/profile/63be318800000000270292d1?xsec_token=ABUsqD9zJZDrpBRj0vEgZ9lwORpvS2c3RJj5QNg6MlejI=&xsec_source=pc_feed";
-        let (uid, token) = parse_creator_url(url).unwrap();
+        let (uid, token) = parse_creator_link(url).unwrap();
         assert_eq!(uid, "63be318800000000270292d1");
         assert_eq!(token, "ABUsqD9zJZDrpBRj0vEgZ9lwORpvS2c3RJj5QNg6MlejI=");
     }
 
     #[test]
-    fn test_parse_creator_url_no_query() {
+    fn test_parse_creator_link_no_query() {
         let (uid, token) =
-            parse_creator_url("https://www.xiaohongshu.com/user/profile/abc123").unwrap();
+            parse_creator_link("https://www.xiaohongshu.com/user/profile/abc123").unwrap();
         assert_eq!(uid, "abc123");
         assert_eq!(token, "");
     }
