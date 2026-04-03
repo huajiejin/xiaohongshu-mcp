@@ -9,7 +9,7 @@ const XSEC_SOURCE_PC_SEARCH: &str = "pc_search";
 const XSEC_SOURCE_PC_USER: &str = "pc_user";
 
 #[derive(Debug, Clone, Copy)]
-pub enum FeedStateRoot {
+pub enum ExtractionRoot {
     Explore,
     Search,
     UserProfile,
@@ -24,7 +24,7 @@ pub struct HrefParts {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct FeedCard {
+pub struct NoteCard {
     pub id: Option<String>,
     pub xsec_token: Option<String>,
     pub xsec_source: Option<String>,
@@ -44,7 +44,7 @@ pub struct FeedCard {
     pub video_duration_secs: Option<u64>,
 }
 
-impl FeedCard {
+impl NoteCard {
     pub fn explore_href(&self) -> Option<String> {
         match (&self.id, &self.xsec_token) {
             (Some(note_id), Some(token)) => Some(format!(
@@ -72,12 +72,12 @@ impl FeedCard {
         }
     }
 
-    pub fn href(&self, root: Option<FeedStateRoot>) -> Option<String> {
+    pub fn href(&self, root: Option<ExtractionRoot>) -> Option<String> {
         match root {
             Some(root) => match root {
-                FeedStateRoot::Explore => self.explore_href(),
-                FeedStateRoot::Search => self.search_result_href(),
-                FeedStateRoot::UserProfile => self.user_profile_href(),
+                ExtractionRoot::Explore => self.explore_href(),
+                ExtractionRoot::Search => self.search_result_href(),
+                ExtractionRoot::UserProfile => self.user_profile_href(),
             },
             None => match &self.xsec_source {
                 Some(xsec_source) => match xsec_source.as_str() {
@@ -123,42 +123,42 @@ pub fn parse_creator_url(url: &str) -> Option<(String, String)> {
     Some((user_id, xsec_token))
 }
 
-pub async fn extract_feed_cards_with_fallback(
+pub async fn extract_note_cards_with_fallback(
     page: &Page,
-    root: FeedStateRoot,
-) -> Result<Vec<FeedCard>> {
-    let state_cards = extract_feed_cards_from_initial_state(page, root)
+    root: ExtractionRoot,
+) -> Result<Vec<NoteCard>> {
+    let state_cards = extract_note_cards_from_initial_state(page, root)
         .await
         .unwrap_or_default();
     if !state_cards.is_empty() {
         return Ok(state_cards);
     }
 
-    extract_feed_cards_from_dom(page).await
+    extract_note_cards_from_dom(page).await
 }
 
-pub async fn extract_feed_cards_from_initial_state(
+pub async fn extract_note_cards_from_initial_state(
     page: &Page,
-    root: FeedStateRoot,
-) -> Result<Vec<FeedCard>> {
+    root: ExtractionRoot,
+) -> Result<Vec<NoteCard>> {
     let state = extract_initial_state(page).await?;
 
-    let feeds = match root {
-        FeedStateRoot::Explore => state.get("feed_feeds"),
-        FeedStateRoot::Search => state.get("search_feeds"),
-        FeedStateRoot::UserProfile => state.get("user_notes"),
+    let notes = match root {
+        ExtractionRoot::Explore => state.get("feed_feeds"),
+        ExtractionRoot::Search => state.get("search_feeds"),
+        ExtractionRoot::UserProfile => state.get("user_notes"),
     };
 
-    let Some(feeds) = feeds else {
+    let Some(notes) = notes else {
         return Ok(Vec::new());
     };
 
-    let Some(feeds) = feeds.as_array() else {
+    let Some(notes) = notes.as_array() else {
         return Ok(Vec::new());
     };
 
-    let mut cards = Vec::with_capacity(feeds.len());
-    for item in feeds {
+    let mut cards = Vec::with_capacity(notes.len());
+    for item in notes {
         if let Some(card) = card_from_state_item(item) {
             cards.push(card);
         }
@@ -167,7 +167,7 @@ pub async fn extract_feed_cards_from_initial_state(
     Ok(cards)
 }
 
-pub async fn extract_feed_cards_from_dom(page: &Page) -> Result<Vec<FeedCard>> {
+pub async fn extract_note_cards_from_dom(page: &Page) -> Result<Vec<NoteCard>> {
     let sections = match page.find_elements(EXPLORE_SECTIONS_SELECTOR).await {
         Ok(v) => v,
         Err(_) => return Ok(Vec::new()),
@@ -190,7 +190,7 @@ pub async fn extract_feed_cards_from_dom(page: &Page) -> Result<Vec<FeedCard>> {
 
         let href_parts = parse_href_parts(&href_raw);
 
-        cards.push(FeedCard {
+        cards.push(NoteCard {
             id: href_parts.note_id.clone(),
             xsec_token: href_parts.xsec_token.clone(),
             publish_time: None,
@@ -262,7 +262,7 @@ pub fn parse_href_parts(raw_href: &str) -> HrefParts {
     }
 }
 
-fn card_from_state_item(item: &serde_json::Value) -> Option<FeedCard> {
+fn card_from_state_item(item: &serde_json::Value) -> Option<NoteCard> {
     let id = item
         .get("id")
         .and_then(|v| v.as_str())
@@ -335,7 +335,7 @@ fn card_from_state_item(item: &serde_json::Value) -> Option<FeedCard> {
         .and_then(|item| item.get("text").and_then(|t| t.as_str()))
         .map(ToString::to_string);
 
-    Some(FeedCard {
+    Some(NoteCard {
         id,
         xsec_token,
         publish_time,
@@ -490,7 +490,7 @@ mod tests {
 
     #[test]
     fn test_creator_profile_url() {
-        let card = FeedCard {
+        let card = NoteCard {
             id: Some("note1".to_string()),
             xsec_token: Some("note_tok".to_string()),
             xsec_source: None,

@@ -1,9 +1,9 @@
 use crate::browser::{self, BrowserOptions};
 use crate::extractor::extract_initial_state;
-use crate::feed_extract::{
-    FeedCard, FeedStateRoot, extract_feed_cards_from_initial_state, parse_creator_url,
-};
 use crate::human::{HumanBehavior, ScrollSpeed};
+use crate::note_extract::{
+    ExtractionRoot, NoteCard, extract_note_cards_from_initial_state, parse_creator_url,
+};
 use crate::t;
 use anyhow::{Result, anyhow};
 use serde::Serialize;
@@ -54,7 +54,7 @@ pub struct CreatorResult {
     pub user_info: Option<UserInfo>,
     pub interactions: Vec<UserInteraction>,
     pub total: usize,
-    pub posts: Vec<FeedCard>,
+    pub notes: Vec<NoteCard>,
     pub duration_secs: u64,
     pub collected_at: String,
 }
@@ -78,23 +78,23 @@ impl fmt::Display for CreatorResult {
             f,
             "{}",
             t!(
-                "creator.matched_posts",
+                "creator.matched_notes",
                 user_id = &self.user_id,
                 count = self.total,
                 time = self.duration_secs,
                 collected_at = &self.collected_at,
             )
         )?;
-        for (i, post) in self.posts.iter().enumerate() {
-            let id = post.id.as_deref().unwrap_or("");
-            let note_type = post.note_type.as_deref().unwrap_or("-");
+        for (i, note) in self.notes.iter().enumerate() {
+            let id = note.id.as_deref().unwrap_or("");
+            let note_type = note.note_type.as_deref().unwrap_or("-");
             writeln!(
                 f,
                 "  {}",
                 t!(
-                    "creator.post_line",
+                    "creator.note_line",
                     index = i + 1,
-                    title = &post.title,
+                    title = &note.title,
                     note_type = note_type,
                     id = id,
                 )
@@ -106,7 +106,7 @@ impl fmt::Display for CreatorResult {
 
 pub struct CreatorOptions {
     pub url: String,
-    pub max_posts: Option<usize>,
+    pub max_notes: Option<usize>,
     pub scroll_speed: ScrollSpeed,
     pub duration: Option<u64>,
 }
@@ -127,15 +127,15 @@ pub async fn run(opts: &CreatorOptions, browser_opts: &BrowserOptions) -> Result
 
     let mut human = HumanBehavior::new();
     let mut seen_keys = HashSet::new();
-    let mut posts: Vec<FeedCard> = Vec::new();
+    let mut notes: Vec<NoteCard> = Vec::new();
     let start = Instant::now();
 
-    collect_posts(&page, &mut posts, &mut seen_keys, opts, &mut human, &start).await;
+    collect_notes(&page, &mut notes, &mut seen_keys, opts, &mut human, &start).await;
 
     let duration_secs = start.elapsed().as_secs();
-    let total = posts.len();
+    let total = notes.len();
     debug!(
-        "done: creator fetched {} posts in {}s",
+        "done: creator fetched {} notes in {}s",
         total, duration_secs
     );
 
@@ -144,27 +144,27 @@ pub async fn run(opts: &CreatorOptions, browser_opts: &BrowserOptions) -> Result
         user_info,
         interactions,
         total,
-        posts,
+        notes,
         duration_secs,
         collected_at: chrono::Utc::now().to_rfc3339(),
     })
 }
 
-async fn collect_posts(
+async fn collect_notes(
     page: &chromiumoxide::page::Page,
-    posts: &mut Vec<FeedCard>,
+    notes: &mut Vec<NoteCard>,
     seen_keys: &mut HashSet<String>,
     opts: &CreatorOptions,
     human: &mut HumanBehavior,
     start: &Instant,
 ) {
     loop {
-        if should_stop(opts, posts.len(), *start) {
+        if should_stop(opts, notes.len(), *start) {
             break;
         }
 
         let cards =
-            match extract_feed_cards_from_initial_state(page, FeedStateRoot::UserProfile).await {
+            match extract_note_cards_from_initial_state(page, ExtractionRoot::UserProfile).await {
                 Ok(v) => v,
                 Err(_) => {
                     human.random_delay(human.config.human_delay.clone()).await;
@@ -182,20 +182,20 @@ async fn collect_posts(
             new_in_batch += 1;
 
             let id = card.id.clone().unwrap_or_default();
-            debug!("[{}] {} | {}", posts.len() + 1, card.title, id);
-            posts.push(card);
+            debug!("[{}] {} | {}", notes.len() + 1, card.title, id);
+            notes.push(card);
 
-            if should_stop(opts, posts.len(), *start) {
+            if should_stop(opts, notes.len(), *start) {
                 break;
             }
         }
 
-        if should_stop(opts, posts.len(), *start) {
+        if should_stop(opts, notes.len(), *start) {
             break;
         }
 
         if new_in_batch == 0 {
-            debug!("no new posts in this scroll, stopping");
+            debug!("no new notes in this scroll, stopping");
             break;
         }
 
@@ -236,10 +236,10 @@ async fn wait_initial_state(page: &chromiumoxide::page::Page) -> Result<()> {
 }
 
 fn should_stop(opts: &CreatorOptions, matched: usize, start: Instant) -> bool {
-    if let Some(max) = opts.max_posts
+    if let Some(max) = opts.max_notes
         && matched >= max
     {
-        debug!("reached max posts limit ({max})");
+        debug!("reached max notes limit ({max})");
         return true;
     }
     if let Some(dur) = opts.duration
@@ -251,7 +251,7 @@ fn should_stop(opts: &CreatorOptions, matched: usize, start: Instant) -> bool {
     false
 }
 
-fn card_unique_key(card: &FeedCard) -> String {
+fn card_unique_key(card: &NoteCard) -> String {
     if let Some(id) = &card.id {
         return format!("id:{id}");
     }

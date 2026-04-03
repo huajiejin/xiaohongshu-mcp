@@ -1,6 +1,6 @@
 use crate::browser::{self, BrowserOptions};
-use crate::feed_extract::{FeedCard, FeedStateRoot, extract_feed_cards_with_fallback};
 use crate::human::{HumanBehavior, ScrollSpeed};
+use crate::note_extract::{ExtractionRoot, NoteCard, extract_note_cards_with_fallback};
 use crate::t;
 use crate::utils::ApiResponseWatcher;
 use anyhow::{Result, anyhow};
@@ -210,13 +210,11 @@ impl ToFilterClick for Location {
     }
 }
 
-pub type PostItem = FeedCard;
-
 #[derive(Serialize)]
 pub struct SearchResult {
     pub query: String,
     pub total: usize,
-    pub posts: Vec<PostItem>,
+    pub notes: Vec<NoteCard>,
     pub duration_secs: u64,
     #[serde(with = "chrono::serde::ts_seconds")]
     pub collected_at: chrono::DateTime<chrono::Utc>,
@@ -228,28 +226,28 @@ impl fmt::Display for SearchResult {
             f,
             "{}",
             t!(
-                "search.matched_posts",
+                "search.matched_notes",
                 query = &self.query,
                 count = self.total,
                 time = self.duration_secs,
                 collected_at = &self.collected_at,
             )
         )?;
-        for (i, post) in self.posts.iter().enumerate() {
-            let id = post.id.as_deref().unwrap_or("");
-            let creator = post.creator_name.as_deref().unwrap_or("-");
-            let creator_id = post.creator_id.as_deref().unwrap_or("-");
-            let note_type = post.note_type.as_deref().unwrap_or("-");
-            let profile_url = post
+        for (i, note) in self.notes.iter().enumerate() {
+            let id = note.id.as_deref().unwrap_or("");
+            let creator = note.creator_name.as_deref().unwrap_or("-");
+            let creator_id = note.creator_id.as_deref().unwrap_or("-");
+            let note_type = note.note_type.as_deref().unwrap_or("-");
+            let profile_url = note
                 .creator_profile_url()
                 .unwrap_or_else(|| "-".to_string());
             writeln!(
                 f,
                 "  {}",
                 t!(
-                    "search.post_line",
+                    "search.note_line",
                     index = i + 1,
-                    title = &post.title,
+                    title = &note.title,
                     creator = creator,
                     creator_id = creator_id,
                     note_type = note_type,
@@ -269,7 +267,7 @@ pub struct SearchOptions {
     pub publish_time: Option<PublishTime>,
     pub search_scope: Option<SearchScope>,
     pub location: Option<Location>,
-    pub max_posts: Option<usize>,
+    pub max_notes: Option<usize>,
     pub scroll_speed: ScrollSpeed,
     pub duration: Option<u64>,
 }
@@ -293,16 +291,16 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
     if has_filters {
         apply_filters(&page, opts, &mut human).await?;
     }
-    let mut seen_keys = HashSet::new();
-    let mut posts: Vec<PostItem> = Vec::new();
+    let mut seen_keys: HashSet<String> = HashSet::new();
+    let mut notes: Vec<NoteCard> = Vec::new();
     let start = Instant::now();
 
     loop {
-        if should_stop(opts, posts.len(), start) {
+        if should_stop(opts, notes.len(), start) {
             break;
         }
 
-        let cards = match extract_feed_cards_with_fallback(&page, FeedStateRoot::Search).await {
+        let cards = match extract_note_cards_with_fallback(&page, ExtractionRoot::Search).await {
             Ok(v) => v,
             Err(_) => {
                 human.random_delay(human.config.human_delay.clone()).await;
@@ -318,15 +316,15 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
             seen_keys.insert(key);
 
             let id = card.id.clone().unwrap_or_default();
-            debug!("[{}] {} | {}", posts.len() + 1, card.title, id);
-            posts.push(card);
+            debug!("[{}] {} | {}", notes.len() + 1, card.title, id);
+            notes.push(card);
 
-            if should_stop(opts, posts.len(), start) {
+            if should_stop(opts, notes.len(), start) {
                 break;
             }
         }
 
-        if should_stop(opts, posts.len(), start) {
+        if should_stop(opts, notes.len(), start) {
             break;
         }
 
@@ -335,13 +333,13 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
     }
 
     let duration_secs = start.elapsed().as_secs();
-    let total = posts.len();
-    debug!("done: searched {} posts in {}s", total, duration_secs);
+    let total = notes.len();
+    debug!("done: searched {} notes in {}s", total, duration_secs);
 
     Ok(SearchResult {
         query: opts.query.clone(),
         total,
-        posts,
+        notes,
         duration_secs,
         collected_at: chrono::Utc::now(),
     })
@@ -491,10 +489,10 @@ async fn wait_for_filter_panel(page: &Page) -> bool {
 }
 
 fn should_stop(opts: &SearchOptions, matched: usize, start: Instant) -> bool {
-    if let Some(max) = opts.max_posts
+    if let Some(max) = opts.max_notes
         && matched >= max
     {
-        debug!("reached max posts limit ({max})");
+        debug!("reached max notes limit ({max})");
         return true;
     }
     if let Some(dur) = opts.duration
@@ -506,7 +504,7 @@ fn should_stop(opts: &SearchOptions, matched: usize, start: Instant) -> bool {
     false
 }
 
-fn card_unique_key(card: &FeedCard) -> String {
+fn card_unique_key(card: &NoteCard) -> String {
     if let Some(id) = &card.id {
         return format!("id:{id}");
     }

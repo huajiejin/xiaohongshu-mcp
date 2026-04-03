@@ -5,9 +5,9 @@ pub mod browser;
 pub mod commands;
 pub mod cookies;
 pub mod extractor;
-pub mod feed_extract;
 pub mod human;
 pub mod login_image;
+pub mod note_extract;
 pub mod output;
 pub mod retry;
 pub mod utils;
@@ -68,8 +68,8 @@ pub mod i18n {
     pub fn cli_exclude_help() -> String {
         t!("cli.exclude_help").to_string()
     }
-    pub fn cli_max_posts_help() -> String {
-        t!("cli.max_posts_help").to_string()
+    pub fn cli_max_notes_help() -> String {
+        t!("cli.max_notes_help").to_string()
     }
     pub fn cli_scroll_speed_help() -> String {
         t!("cli.scroll_speed_help").to_string()

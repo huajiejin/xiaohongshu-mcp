@@ -40,7 +40,7 @@ enum Commands {
         exclude: Vec<String>,
 
         #[arg(long)]
-        max_posts: Option<usize>,
+        max_notes: Option<usize>,
 
         #[arg(long, default_value = "normal")]
         scroll_speed: String,
@@ -71,7 +71,7 @@ enum Commands {
         location: Option<String>,
 
         #[arg(long)]
-        max_posts: Option<usize>,
+        max_notes: Option<usize>,
 
         #[arg(long, default_value = "normal")]
         scroll_speed: String,
@@ -84,7 +84,7 @@ enum Commands {
         url: String,
 
         #[arg(long)]
-        max_posts: Option<usize>,
+        max_notes: Option<usize>,
 
         #[arg(long, default_value = "normal")]
         scroll_speed: String,
@@ -119,7 +119,7 @@ fn build_command() -> clap::Command {
         s.about(i18n::cli_explore_about())
             .mut_arg("keywords", |a| a.help(i18n::cli_keywords_help()))
             .mut_arg("exclude", |a| a.help(i18n::cli_exclude_help()))
-            .mut_arg("max_posts", |a| a.help(i18n::cli_max_posts_help()))
+            .mut_arg("max_notes", |a| a.help(i18n::cli_max_notes_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
             .mut_arg("interact", |a| a.help(i18n::cli_interact_help()))
             .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
@@ -132,14 +132,14 @@ fn build_command() -> clap::Command {
             .mut_arg("publish_time", |a| a.help(i18n::cli_publish_time_help()))
             .mut_arg("search_scope", |a| a.help(i18n::cli_search_scope_help()))
             .mut_arg("location", |a| a.help(i18n::cli_location_help()))
-            .mut_arg("max_posts", |a| a.help(i18n::cli_max_posts_help()))
+            .mut_arg("max_notes", |a| a.help(i18n::cli_max_notes_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
             .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
     })
     .mut_subcommand("creator", |s| {
         s.about(i18n::cli_creator_about())
             .mut_arg("url", |a| a.help(i18n::cli_url_help()))
-            .mut_arg("max_posts", |a| a.help(i18n::cli_max_posts_help()))
+            .mut_arg("max_notes", |a| a.help(i18n::cli_max_notes_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
             .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
     })
@@ -201,7 +201,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Explore {
             keywords,
             exclude,
-            max_posts,
+            max_notes,
             scroll_speed,
             interact,
             duration,
@@ -211,7 +211,7 @@ async fn main() -> anyhow::Result<()> {
                 &explore::ExploreOptions {
                     keywords,
                     exclude,
-                    max_posts,
+                    max_notes,
                     scroll_speed: speed,
                     interact,
                     duration,
@@ -228,7 +228,7 @@ async fn main() -> anyhow::Result<()> {
             publish_time,
             search_scope,
             location,
-            max_posts,
+            max_notes,
             scroll_speed,
             duration,
         } => {
@@ -241,7 +241,7 @@ async fn main() -> anyhow::Result<()> {
                     publish_time: publish_time.map(|s| s.parse()).transpose()?,
                     search_scope: search_scope.map(|s| s.parse()).transpose()?,
                     location: location.map(|s| s.parse()).transpose()?,
-                    max_posts,
+                    max_notes,
                     scroll_speed: speed,
                     duration,
                 },
@@ -252,7 +252,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Creator {
             url,
-            max_posts,
+            max_notes,
             scroll_speed,
             duration,
         } => {
@@ -260,7 +260,7 @@ async fn main() -> anyhow::Result<()> {
             let result = creator::run(
                 &creator::CreatorOptions {
                     url,
-                    max_posts,
+                    max_notes,
                     scroll_speed: speed,
                     duration,
                 },

@@ -4,25 +4,25 @@ cli:
   headless_help: "Run browser in headless mode"
   proxy_help: "Proxy server URL"
   lang_help: "Language: en, zh-CN"
-  keywords_help: "Only interact with posts matching these keywords"
-  exclude_help: "Skip posts matching these keywords"
-  max_posts_help: "Stop after N matched posts"
+  keywords_help: "Only interact with notes matching these keywords"
+  exclude_help: "Skip notes matching these keywords"
+  max_notes_help: "Stop after N matched notes"
   scroll_speed_help: "Scroll speed: slow, normal, fast"
-  interact_help: "Click into posts and scroll comments"
+  interact_help: "Click into notes and scroll comments"
   duration_help: "Auto-exit after N seconds"
   auth_about: "Manage authentication (login, logout, status)"
   auth_login_about: "Login via QR code"
   auth_logout_about: "Delete saved cookies"
   auth_status_about: "Check current login status"
-  explore_about: "Explore the Xiaohongshu discover feed"
-  search_about: "Search Xiaohongshu posts"
+  explore_about: "Explore the Xiaohongshu discover page"
+  search_about: "Search Xiaohongshu notes"
   query_help: "Search keyword"
   sort_by_help: "Sort by: general, latest, most_liked, most_commented, most_collected"
   note_type_help: "Note type: all, video, image_text"
   publish_time_help: "Publish time: all, one_day, one_week, half_year"
   search_scope_help: "Search scope: all, viewed, not_viewed, followed"
   location_help: "Location: all, same_city, nearby"
-  creator_about: "Explore a creator's posts. Pass the profile URL from 'xhs explore' or 'xhs search' output."
+  creator_about: "Explore a creator's notes. Pass the profile URL from 'xhs explore' or 'xhs search' output."
   url_help: "Creator profile URL — copy from explore/search profile field"
 
 auth:
@@ -35,11 +35,11 @@ auth:
   error_checking_status: "Error checking login status: %{e}"
 
 explore:
-  matched_posts: "Matched %{count} posts in %{time}s (collected at %{collected_at})"
-  post_line: "%{index}. %{title} | creator: %{creator} | creator_id: %{creator_id} | profile: %{profile_url}"
-  not_logged_in_warn: "not logged in, feed may be limited. Run 'xhs auth login' first."
-  explore_post_failed: "explore post failed: %{e}"
-  click_post_failed: "click post failed: %{e}"
+  matched_notes: "Matched %{count} notes in %{time}s (collected at %{collected_at})"
+  note_line: "%{index}. %{title} | creator: %{creator} | creator_id: %{creator_id} | profile: %{profile_url}"
+  not_logged_in_warn: "not logged in, content may be limited. Run 'xhs auth login' first."
+  explore_note_failed: "explore note failed: %{e}"
+  click_note_failed: "click note failed: %{e}"
   scroll_comments_failed: "scroll comments failed: %{e}"
 
 output:
@@ -70,9 +70,9 @@ extractor:
   initial_state_null: "window.__INITIAL_STATE__ is null"
 
 search:
-  about: "Search Xiaohongshu posts"
-  matched_posts: "Search '%{query}': matched %{count} posts in %{time}s (collected at %{collected_at})"
-  post_line: "%{index}. %{title} | %{creator} | creator_id: %{creator_id} | %{note_type} | profile: %{profile_url}"
+  about: "Search Xiaohongshu notes"
+  matched_notes: "Search '%{query}': matched %{count} notes in %{time}s (collected at %{collected_at})"
+  note_line: "%{index}. %{title} | %{creator} | creator_id: %{creator_id} | %{note_type} | profile: %{profile_url}"
   invalid_sort_by: "invalid sort_by '%{val}', expected: general/latest/most_liked/most_commented/most_collected"
   invalid_note_type: "invalid note_type '%{val}', expected: all/video/image_text"
   invalid_publish_time: "invalid publish_time '%{val}', expected: all/one_day/one_week/half_year"
@@ -86,7 +86,7 @@ search:
   filter_option_not_found: "filter option not found: %{selector}"
 
 creator:
-  matched_posts: "Creator %{user_id}: collected %{count} posts in %{time}s (collected at %{collected_at})"
-  post_line: "%{index}. %{title} | %{note_type} | %{id}"
+  matched_notes: "Creator %{user_id}: collected %{count} notes in %{time}s (collected at %{collected_at})"
+  note_line: "%{index}. %{title} | %{note_type} | %{id}"
   wait_initial_state_timeout: "timed out waiting for creator page to load"
   invalid_url: "invalid creator URL — expected format: https://www.xiaohongshu.com/user/profile/<user_id>?xsec_token=..."

@@ -1,6 +1,6 @@
 use crate::browser::{self, BrowserOptions};
-use crate::feed_extract::{FeedCard, FeedStateRoot, extract_feed_cards_with_fallback};
 use crate::human::{HumanBehavior, ScrollSpeed};
+use crate::note_extract::{ExtractionRoot, NoteCard, extract_note_cards_with_fallback};
 use crate::t;
 use anyhow::{Result, anyhow};
 use chromiumoxide::page::Page;
@@ -20,12 +20,10 @@ const COMMENT_CONTAINER_SELECTORS: &[&str] = &[
     "#noteContainer",
 ];
 
-pub type PostItem = FeedCard;
-
 #[derive(Serialize)]
 pub struct ExploreResult {
     pub total: usize,
-    pub posts: Vec<PostItem>,
+    pub notes: Vec<NoteCard>,
     pub duration_secs: u64,
     #[serde(with = "chrono::serde::ts_seconds")]
     pub collected_at: chrono::DateTime<chrono::Utc>,
@@ -37,7 +35,7 @@ impl fmt::Display for ExploreResult {
             f,
             "{}",
             t!(
-                "explore.matched_posts",
+                "explore.matched_notes",
                 count = self.total,
                 time = self.duration_secs,
                 collected_at = self
@@ -46,19 +44,19 @@ impl fmt::Display for ExploreResult {
                     .format("%Y-%m-%d %H:%M:%S"),
             )
         )?;
-        for (i, post) in self.posts.iter().enumerate() {
-            let creator = post.creator_name.as_deref().unwrap_or("-");
-            let creator_id = post.creator_id.as_deref().unwrap_or("-");
-            let profile_url = post
+        for (i, note) in self.notes.iter().enumerate() {
+            let creator = note.creator_name.as_deref().unwrap_or("-");
+            let creator_id = note.creator_id.as_deref().unwrap_or("-");
+            let profile_url = note
                 .creator_profile_url()
                 .unwrap_or_else(|| "-".to_string());
             writeln!(
                 f,
                 "  {}",
                 t!(
-                    "explore.post_line",
+                    "explore.note_line",
                     index = i + 1,
-                    title = &post.title,
+                    title = &note.title,
                     creator = creator,
                     creator_id = creator_id,
                     profile_url = profile_url.as_str(),
@@ -72,7 +70,7 @@ impl fmt::Display for ExploreResult {
 pub struct ExploreOptions {
     pub keywords: Vec<String>,
     pub exclude: Vec<String>,
-    pub max_posts: Option<usize>,
+    pub max_notes: Option<usize>,
     pub scroll_speed: ScrollSpeed,
     pub interact: bool,
     pub duration: Option<u64>,
@@ -85,24 +83,24 @@ pub async fn run(opts: &ExploreOptions, browser_opts: &BrowserOptions) -> Result
     check_login(&page).await;
 
     let keyword_desc = if opts.keywords.is_empty() {
-        "all posts".to_string()
+        "all notes".to_string()
     } else {
         opts.keywords.join(",")
     };
-    debug!("exploring feed for [{}] (Ctrl+C to stop)", keyword_desc);
+    debug!("exploring notes for [{}] (Ctrl+C to stop)", keyword_desc);
 
     let mut human = HumanBehavior::new();
     let mut seen_keys = HashSet::new();
     let mut interacted_keys = HashSet::new();
-    let mut posts: Vec<PostItem> = Vec::new();
+    let mut notes: Vec<NoteCard> = Vec::new();
     let start = Instant::now();
 
     loop {
-        if should_stop(opts, posts.len(), start) {
+        if should_stop(opts, notes.len(), start) {
             break;
         }
 
-        let cards = match extract_feed_cards_with_fallback(&page, FeedStateRoot::Explore).await {
+        let cards = match extract_note_cards_with_fallback(&page, ExtractionRoot::Explore).await {
             Ok(v) => v,
             Err(_) => {
                 human.random_delay(human.config.human_delay.clone()).await;
@@ -128,25 +126,25 @@ pub async fn run(opts: &ExploreOptions, browser_opts: &BrowserOptions) -> Result
             }
 
             let id = card.id.clone().unwrap_or_default();
-            debug!("[{}] {} | {}", posts.len() + 1, title, id);
-            posts.push(card.clone());
+            debug!("[{}] {} | {}", notes.len() + 1, title, id);
+            notes.push(card.clone());
 
             if opts.interact
                 && !interacted_keys.contains(&key)
-                && let Err(e) = explore_post_by_card(&page, &card, &mut human).await
+                && let Err(e) = explore_note_by_card(&page, &card, &mut human).await
             {
                 interacted_keys.insert(key);
-                warn!("{}", t!("explore.explore_post_failed", e = e.to_string()));
+                warn!("{}", t!("explore.explore_note_failed", e = e.to_string()));
             } else if opts.interact {
                 interacted_keys.insert(key);
             }
 
-            if should_stop(opts, posts.len(), start) {
+            if should_stop(opts, notes.len(), start) {
                 break;
             }
         }
 
-        if should_stop(opts, posts.len(), start) {
+        if should_stop(opts, notes.len(), start) {
             break;
         }
 
@@ -155,23 +153,23 @@ pub async fn run(opts: &ExploreOptions, browser_opts: &BrowserOptions) -> Result
     }
 
     let duration_secs = start.elapsed().as_secs();
-    let total = posts.len();
-    debug!("done: explored {} posts in {}s", total, duration_secs);
+    let total = notes.len();
+    debug!("done: explored {} notes in {}s", total, duration_secs);
 
     Ok(ExploreResult {
         total,
-        posts,
+        notes,
         duration_secs,
         collected_at: chrono::Utc::now(),
     })
 }
 
-async fn explore_post_by_card(
+async fn explore_note_by_card(
     page: &Page,
-    card: &FeedCard,
+    card: &NoteCard,
     human: &mut HumanBehavior,
 ) -> Result<()> {
-    click_post(page, card, FeedStateRoot::Explore).await?;
+    click_note(page, card, ExtractionRoot::Explore).await?;
 
     human.random_delay(human.config.short_read.clone()).await;
 
@@ -198,7 +196,7 @@ async fn explore_post_by_card(
     Ok(())
 }
 
-async fn click_post(page: &Page, card: &FeedCard, root: FeedStateRoot) -> Result<()> {
+async fn click_note(page: &Page, card: &NoteCard, root: ExtractionRoot) -> Result<()> {
     if let Some(href) = &card.href(Some(root)) {
         let href_js = serde_json::to_string(href)?;
         let js = format!(
@@ -231,8 +229,8 @@ async fn click_post(page: &Page, card: &FeedCard, root: FeedStateRoot) -> Result
     }
 
     Err(anyhow!(t!(
-        "explore.click_post_failed",
-        e = "post element not found"
+        "explore.click_note_failed",
+        e = "note element not found"
     )))
 }
 
@@ -257,10 +255,10 @@ async fn close_detail(page: &Page) {
 }
 
 fn should_stop(opts: &ExploreOptions, matched: usize, start: Instant) -> bool {
-    if let Some(max) = opts.max_posts
+    if let Some(max) = opts.max_notes
         && matched >= max
     {
-        debug!("reached max posts limit ({max})");
+        debug!("reached max notes limit ({max})");
         return true;
     }
     if let Some(dur) = opts.duration
@@ -282,7 +280,7 @@ async fn check_login(page: &Page) {
     }
 }
 
-fn card_unique_key(card: &FeedCard) -> String {
+fn card_unique_key(card: &NoteCard) -> String {
     if let Some(id) = &card.id {
         return format!("id:{id}");
     }

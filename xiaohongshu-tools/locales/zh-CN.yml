@@ -6,7 +6,7 @@ cli:
   lang_help: "语言: en, zh-CN"
   keywords_help: "仅与匹配这些关键词的笔记互动"
   exclude_help: "跳过匹配这些关键词的笔记"
-  max_posts_help: "匹配 N 篇笔记后停止"
+  max_notes_help: "匹配 N 篇笔记后停止"
   scroll_speed_help: "滚动速度: slow, normal, fast"
   interact_help: "点击进入笔记并滚动评论区"
   duration_help: "N 秒后自动退出"
@@ -35,11 +35,11 @@ auth:
   error_checking_status: "检查登录状态出错: %{e}"
 
 explore:
-  matched_posts: "匹配到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
-  post_line: "%{index}. %{title} | 创作者: %{creator} | 创作者ID: %{creator_id} | 主页: %{profile_url}"
+  matched_notes: "匹配到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
+  note_line: "%{index}. %{title} | 创作者: %{creator} | 创作者ID: %{creator_id} | 主页: %{profile_url}"
   not_logged_in_warn: "未登录，内容可能受限。请先运行 'xhs auth login'。"
-  explore_post_failed: "探索笔记失败: %{e}"
-  click_post_failed: "点击笔记失败: %{e}"
+  explore_note_failed: "探索笔记失败: %{e}"
+  click_note_failed: "点击笔记失败: %{e}"
   scroll_comments_failed: "滚动评论失败: %{e}"
 
 output:
@@ -71,8 +71,8 @@ extractor:
 
 search:
   about: "搜索小红书笔记"
-  matched_posts: "搜索 '%{query}'：匹配到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
-  post_line: "%{index}. %{title} | %{creator} | 创作者ID: %{creator_id} | %{note_type} | 主页: %{profile_url}"
+  matched_notes: "搜索 '%{query}'：匹配到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
+  note_line: "%{index}. %{title} | %{creator} | 创作者ID: %{creator_id} | %{note_type} | 主页: %{profile_url}"
   invalid_sort_by: "无效的排序方式 '%{val}'，可选: general/latest/most_liked/most_commented/most_collected"
   invalid_note_type: "无效的笔记类型 '%{val}'，可选: all/video/image_text"
   invalid_publish_time: "无效的发布时间 '%{val}'，可选: all/one_day/one_week/half_year"
@@ -86,7 +86,7 @@ search:
   filter_option_not_found: "未找到筛选选项: %{selector}"
 
 creator:
-  matched_posts: "创作者 %{user_id}：收集到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
-  post_line: "%{index}. %{title} | %{note_type} | %{id}"
+  matched_notes: "创作者 %{user_id}：收集到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
+  note_line: "%{index}. %{title} | %{note_type} | %{id}"
   wait_initial_state_timeout: "等待创作者主页加载超时"
   invalid_url: "无效的创作者主页 URL — 格式: https://www.xiaohongshu.com/user/profile/<user_id>?xsec_token=..."
