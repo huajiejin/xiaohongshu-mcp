@@ -1,4 +1,4 @@
-use crate::extractor::extract_initial_state;
+use crate::t;
 use anyhow::Result;
 use chromiumoxide::page::Page;
 use serde::Serialize;
@@ -7,6 +7,31 @@ const EXPLORE_SECTIONS_SELECTOR: &str = "#exploreFeeds section";
 const XSEC_SOURCE_PC_FEED: &str = "pc_feed";
 const XSEC_SOURCE_PC_SEARCH: &str = "pc_search";
 const XSEC_SOURCE_PC_USER: &str = "pc_user";
+
+pub async fn extract_initial_state(page: &Page) -> Result<serde_json::Value> {
+    let js = r#"(() => {
+        const s = window.__INITIAL_STATE__;
+        if (!s) return null;
+		const get_val = (o) => o?.value || o?._value || o?._rawValue;
+		const flatten = (arr) => Array.isArray(arr) && arr.some(Array.isArray) ? arr.flat() : arr;
+		const feed_feeds = flatten(get_val(s?.feed?.feeds));
+		const search_feeds = flatten(get_val(s?.search?.feeds));
+		const user_notes = flatten(get_val(s?.user?.notes));
+		const user_data = get_val(s?.user?.userPageData);
+        return JSON.parse(JSON.stringify({feed_feeds, search_feeds, user_notes, user_data}));
+    })()"#;
+
+    let value = page
+        .evaluate_expression(js)
+        .await?
+        .into_value::<serde_json::Value>()?;
+
+    if value.is_null() {
+        anyhow::bail!("{}", t!("extractor.initial_state_null"));
+    }
+
+    Ok(value)
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum ExtractionRoot {
@@ -73,22 +98,23 @@ impl NoteCard {
     }
 
     pub fn href(&self, root: Option<ExtractionRoot>) -> Option<String> {
-        match root {
-            Some(root) => match root {
+        root.map_or_else(
+            || {
+                self.xsec_source
+                    .as_ref()
+                    .and_then(|xsec_source| match xsec_source.as_str() {
+                        XSEC_SOURCE_PC_FEED => self.explore_href(),
+                        XSEC_SOURCE_PC_SEARCH => self.search_result_href(),
+                        XSEC_SOURCE_PC_USER => self.user_profile_href(),
+                        _ => None,
+                    })
+            },
+            |root| match root {
                 ExtractionRoot::Explore => self.explore_href(),
                 ExtractionRoot::Search => self.search_result_href(),
                 ExtractionRoot::UserProfile => self.user_profile_href(),
             },
-            None => match &self.xsec_source {
-                Some(xsec_source) => match xsec_source.as_str() {
-                    XSEC_SOURCE_PC_FEED => self.explore_href(),
-                    XSEC_SOURCE_PC_SEARCH => self.search_result_href(),
-                    XSEC_SOURCE_PC_USER => self.user_profile_href(),
-                    _ => None,
-                },
-                _ => None,
-            },
-        }
+        )
     }
 
     pub fn creator_profile_url(&self) -> Option<String> {
@@ -215,13 +241,9 @@ pub async fn extract_note_cards_from_dom(page: &Page) -> Result<Vec<NoteCard>> {
 }
 
 pub fn parse_href_parts(raw_href: &str) -> HrefParts {
-    let mut path = raw_href.to_string();
-    let mut query = "";
-
-    if let Some((p, q)) = raw_href.split_once('?') {
-        path = p.to_string();
-        query = q;
-    }
+    let (path, query) = raw_href
+        .split_once('?')
+        .map_or_else(|| (raw_href.to_string(), ""), |(p, q)| (p.to_string(), q));
 
     let normalized_path = if path.starts_with("http://") || path.starts_with("https://") {
         match path.split_once("xiaohongshu.com") {

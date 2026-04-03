@@ -1,5 +1,5 @@
+use crate::shared::utils;
 use crate::t;
-use crate::utils;
 use anyhow::{Result, anyhow};
 use chromiumoxide::page::Page;
 use std::env;

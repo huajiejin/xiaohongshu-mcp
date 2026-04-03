@@ -1,6 +1,6 @@
+use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
-use crate::human::{HumanBehavior, ScrollSpeed};
-use crate::note_extract::{ExtractionRoot, NoteCard, extract_note_cards_with_fallback};
+use crate::extract::note::{ExtractionRoot, NoteCard, extract_note_cards_with_fallback};
 use crate::t;
 use anyhow::{Result, anyhow};
 use chromiumoxide::page::Page;

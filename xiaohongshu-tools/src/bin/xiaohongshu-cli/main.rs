@@ -1,10 +1,10 @@
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
+use xiaohongshu_tools::browser::human::ScrollSpeed;
 use xiaohongshu_tools::commands::{creator, explore, search};
-use xiaohongshu_tools::human::ScrollSpeed;
-use xiaohongshu_tools::i18n;
-use xiaohongshu_tools::output::{Format, Output};
+use xiaohongshu_tools::shared::i18n;
+use xiaohongshu_tools::shared::output::{Format, Output};
 
 #[derive(Parser)]
 #[command(name = "xhs")]

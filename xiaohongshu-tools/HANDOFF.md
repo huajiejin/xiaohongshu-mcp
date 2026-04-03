@@ -237,6 +237,20 @@ Renamed all `author` references to `creator` across the entire codebase:
 **`locales/zh-CN.yml`:**
 - Same structural changes, `作者` → `创作者`
 
+### Batch 13: Module Reorganization
+
+**Full reorganization of `src/` into module folders:**
+
+- `browser/` — `launch.rs` (was browser.rs), `cookies.rs`, `human.rs`
+- `auth/` — `flow.rs` (was auth.rs), `login_image.rs`
+- `extract/` — `note.rs` (merged `extractor.rs` + `note_extract.rs`)
+- `shared/` — `i18n.rs` (extracted from lib.rs inline module), `output.rs`, `retry.rs`, `utils.rs`
+- `commands/` — unchanged structure, updated imports
+- All `mod.rs` files are re-export only (no business logic)
+- `lib.rs` reduced to: `rust_i18n::i18n!()` macro + 5 `pub mod` declarations + `pub use t!`
+- Fixed 6 clippy nursery warnings (redundant clones, option_if_let_else, or_fun_call)
+- All 10 tests pass, zero clippy warnings
+
 ### Remaining follow-up work (next session)
 
 - Add optional count normalization helpers (e.g. `1.2w` -> numeric) if downstream consumers need numeric sorting.
@@ -248,25 +262,33 @@ Renamed all `author` references to `creator` across the entire codebase:
 
 ```
 src/
-├── lib.rs              # Module declarations + i18n helpers
-├── auth.rs             # Login (QR scan) + check_status, returns structured results
-├── browser.rs          # Browser launch (chromiumoxide), stealth, cookies injection, proxy, viewport
-├── cookies.rs          # Cookie persist/load/delete (JSON file at config dir)
-├── output.rs           # Structured output (text/json) via --format flag
-├── retry.rs            # Generic retry with exponential backoff + jitter
-├── human.rs            # Human behavior simulation (delays, scrolling, clicking)
-├── extractor.rs        # Extract data from window.__INITIAL_STATE__ via JS eval
-├── feed_extract.rs     # Shared feed card extraction (INITIAL_STATE first, DOM fallback)
-├── login_image.rs      # QR code image extraction and display
-├── utils.rs            # Shared utilities (polling, data URL decode, file open)
+├── lib.rs                       # rust_i18n init macro + pub mod declarations + re-export t!
+├── browser/
+│   ├── mod.rs                   # Re-exports: BrowserOptions, launch, extract_cookies, etc.
+│   ├── launch.rs                # Browser launch (chromiumoxide), stealth, cookies injection, proxy, viewport
+│   ├── cookies.rs               # Cookie persist/load/delete (JSON file at config dir)
+│   └── human.rs                 # Human behavior simulation (delays, scrolling, clicking)
+├── auth/
+│   ├── mod.rs                   # Re-exports: login, logout, check_status, result structs
+│   ├── flow.rs                  # Auth flows: login (QR scan), logout, status check
+│   └── login_image.rs           # QR code image extraction and display
+├── extract/
+│   ├── mod.rs                   # Re-exports: NoteCard, ExtractionRoot, extract_* functions
+│   └── note.rs                  # __INITIAL_STATE__ JS eval + note card extraction + DOM fallback
+├── shared/
+│   ├── mod.rs                   # Re-exports: Format, Output, RetryConfig, etc.
+│   ├── i18n.rs                  # Locale detection + CLI help string helpers
+│   ├── output.rs                # Structured output (text/json) via --format flag
+│   ├── retry.rs                 # Generic retry with exponential backoff + jitter
+│   └── utils.rs                 # Shared utilities (polling, data URL decode, file open, API watcher)
 ├── commands/
-│   ├── mod.rs
-│   ├── explore.rs       # Explore discover feed with filtering and interaction
-│   ├── search.rs        # Search with filters (sort, type, time, scope, location)
-│   └── creator.rs        # Creator profile exploration (accepts profile URL)
+│   ├── mod.rs                   # Re-exports command submodules
+│   ├── explore.rs               # Explore discover feed with filtering and interaction
+│   ├── search.rs                # Search with filters (sort, type, time, scope, location)
+│   └── creator.rs               # Creator profile exploration (accepts profile URL)
 └── bin/
     └── xiaohongshu-cli/
-        └── main.rs     # CLI entry point (clap), --format, --headless, --proxy
+        └── main.rs              # CLI entry point (clap), --format, --headless, --proxy
 ```
 
 ## CLI Usage (current)
@@ -314,7 +336,7 @@ Implement feature parity with the competitor:
 - `xhs like <note_id>` / `xhs favorite <note_id>`
 - `xhs comment <note_id> <text>`
 
-All use `src/extractor.rs` for reading `window.__INITIAL_STATE__` via JS eval.
+All use `src/extract/note.rs` for reading `window.__INITIAL_STATE__` via JS eval.
 
 ### Phase 3: Competitive Edge
 
@@ -357,7 +379,7 @@ base64 = "0.22"              # Data URL decoding for login image
 ```bash
 cd xiaohongshu-tools
 cargo build          # Build
-cargo test           # Run tests (retry: 3, feed_extract: 7)
+cargo test           # Run tests (extract::note: 7, shared::retry: 3)
 cargo fmt            # Format
 cargo run -- --help  # CLI help
 RUST_LOG=debug cargo run -- auth status  # Debug logging

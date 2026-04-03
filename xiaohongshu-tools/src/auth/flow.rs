@@ -1,6 +1,6 @@
+use super::login_image;
+use crate::browser::cookies;
 use crate::browser::{self, BrowserOptions};
-use crate::cookies;
-use crate::login_image;
 use crate::t;
 use anyhow::Result;
 use chromiumoxide::page::Page;

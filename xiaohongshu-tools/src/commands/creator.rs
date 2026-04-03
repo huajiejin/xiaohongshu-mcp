@@ -1,7 +1,7 @@
+use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
-use crate::extractor::extract_initial_state;
-use crate::human::{HumanBehavior, ScrollSpeed};
-use crate::note_extract::{
+use crate::extract::note::extract_initial_state;
+use crate::extract::note::{
     ExtractionRoot, NoteCard, extract_note_cards_from_initial_state, parse_creator_url,
 };
 use crate::t;
