@@ -8,9 +8,7 @@ use std::fmt;
 const XHS_DOMAIN: &str = "https://www.xiaohongshu.com";
 const EXPLORE_SECTIONS_SELECTOR: &str = "#exploreFeeds section";
 const XSEC_SOURCE_PC_SEARCH: &str = "pc_search";
-#[allow(dead_code)]
 const XSEC_SOURCE_PC_FEED: &str = "pc_feed";
-#[allow(dead_code)]
 const XSEC_SOURCE_PC_USER: &str = "pc_user";
 
 pub async fn extract_initial_state(page: &Page) -> Result<serde_json::Value> {
@@ -43,6 +41,16 @@ pub enum ExtractionRoot {
     Explore,
     Search,
     UserProfile,
+}
+
+impl ExtractionRoot {
+    fn xsec_source(&self) -> &'static str {
+        match self {
+            ExtractionRoot::Explore => XSEC_SOURCE_PC_FEED,
+            ExtractionRoot::Search => XSEC_SOURCE_PC_SEARCH,
+            ExtractionRoot::UserProfile => XSEC_SOURCE_PC_USER,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -439,9 +447,12 @@ pub async fn extract_note_cards_from_initial_state(
         return Ok(Vec::new());
     };
 
+    let xsec_source = root.xsec_source();
+
     let mut cards = Vec::with_capacity(notes.len());
     for item in notes {
-        if let Some(card) = card_from_state_item(item) {
+        if let Some(mut card) = card_from_state_item(item) {
+            card.xsec_source = Some(xsec_source.to_string());
             cards.push(card);
         }
     }
@@ -604,6 +615,7 @@ fn card_from_state_item(item: &serde_json::Value) -> Option<NoteCard> {
     Some(NoteCard {
         id,
         xsec_token,
+        xsec_source: None,
         publish_time,
         note_type,
         title,
@@ -618,7 +630,6 @@ fn card_from_state_item(item: &serde_json::Value) -> Option<NoteCard> {
         shared_count,
         cover_url,
         video_duration_secs,
-        xsec_source: Some("pc_search".to_string()),
     })
 }
 
