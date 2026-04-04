@@ -28,8 +28,8 @@ cli:
   open_url_help: "URL to open"
   note_about: "Get note detail with comments"
   note_url_help: "Note URL — copy from explore/search output"
-  max_comments_help: "Max top-level comments to load (0 = skip scrolling, default: 20)"
-  max_replies_help: "Max sub-replies to expand per comment (default: 10)"
+  max_comments_help: "Max top-level comments to load"
+  max_replies_help: "Max sub-replies to expand per comment"
 
 auth:
   logged_in: "Logged in"

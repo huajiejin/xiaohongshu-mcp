@@ -28,8 +28,8 @@ cli:
   open_url_help: "要打开的 URL"
   note_about: "获取笔记详情及评论"
   note_url_help: "笔记 URL — 从 explore/search 输出中复制"
-  max_comments_help: "最多加载的评论数 (0 = 不滚动加载, 默认: 20)"
-  max_replies_help: "每条评论最多展开的子回复数 (默认: 10)"
+  max_comments_help: "最多加载的评论数"
+  max_replies_help: "每条评论最多展开的子回复数"
 
 auth:
   logged_in: "已登录"
