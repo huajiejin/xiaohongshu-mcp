@@ -48,7 +48,7 @@ impl FromStr for SortBy {
 pub enum NoteType {
     All,
     Video,
-    ImageText,
+    Normal,
 }
 
 impl FromStr for NoteType {
@@ -58,7 +58,7 @@ impl FromStr for NoteType {
         match s {
             "all" => Ok(Self::All),
             "video" => Ok(Self::Video),
-            "image_text" => Ok(Self::ImageText),
+            "normal" => Ok(Self::Normal),
             _ => Err(anyhow!(t!("search.invalid_note_type", val = s))),
         }
     }
@@ -168,7 +168,7 @@ impl ToFilterClick for NoteType {
             tag: match self {
                 Self::All => 1,
                 Self::Video => 2,
-                Self::ImageText => 3,
+                Self::Normal => 3,
             },
         }
     }

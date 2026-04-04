@@ -392,7 +392,7 @@ xhs explore --duration 300               # Auto-exit after 5 minutes
 
 xhs search "keyword"                     # Search posts
 xhs search "keyword" --sort_by latest    # Sort: general, latest, most_liked, most_commented, most_collected
-xhs search "keyword" --note_type video   # Type: all, video, image_text
+xhs search "keyword" --note_type video   # Type: all, video, normal
 xhs search "keyword" --max_posts 20      # Limit results
 
 xhs creator "https://www.xiaohongshu.com/user/profile/<user_id>?xsec_token=<token>&xsec_source=pc_feed"

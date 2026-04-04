@@ -18,7 +18,7 @@ cli:
   search_about: "搜索小红书笔记"
   query_help: "搜索关键词"
   sort_by_help: "排序方式: general, latest, most_liked, most_commented, most_collected"
-  note_type_help: "笔记类型: all, video, image_text"
+  note_type_help: "笔记类型: all, video, normal"
   publish_time_help: "发布时间: all, one_day, one_week, half_year"
   search_scope_help: "搜索范围: all, viewed, not_viewed, followed"
   location_help: "位置距离: all, same_city, nearby"
@@ -80,7 +80,7 @@ extractor:
 search:
   about: "搜索小红书笔记"
   invalid_sort_by: "无效的排序方式 '%{val}'，可选: general/latest/most_liked/most_commented/most_collected"
-  invalid_note_type: "无效的笔记类型 '%{val}'，可选: all/video/image_text"
+  invalid_note_type: "无效的笔记类型 '%{val}'，可选: all/video/normal"
   invalid_publish_time: "无效的发布时间 '%{val}'，可选: all/one_day/one_week/half_year"
   invalid_search_scope: "无效的搜索范围 '%{val}'，可选: all/viewed/not_viewed/followed"
   invalid_location: "无效的位置距离 '%{val}'，可选: all/same_city/nearby"

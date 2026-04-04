@@ -18,7 +18,7 @@ cli:
   search_about: "Search Xiaohongshu notes"
   query_help: "Search keyword"
   sort_by_help: "Sort by: general, latest, most_liked, most_commented, most_collected"
-  note_type_help: "Note type: all, video, image_text"
+  note_type_help: "Note type: all, video, normal"
   publish_time_help: "Publish time: all, one_day, one_week, half_year"
   search_scope_help: "Search scope: all, viewed, not_viewed, followed"
   location_help: "Location: all, same_city, nearby"
@@ -80,7 +80,7 @@ extractor:
 search:
   about: "Search Xiaohongshu notes"
   invalid_sort_by: "invalid sort_by '%{val}', expected: general/latest/most_liked/most_commented/most_collected"
-  invalid_note_type: "invalid note_type '%{val}', expected: all/video/image_text"
+  invalid_note_type: "invalid note_type '%{val}', expected: all/video/normal"
   invalid_publish_time: "invalid publish_time '%{val}', expected: all/one_day/one_week/half_year"
   invalid_search_scope: "invalid search_scope '%{val}', expected: all/viewed/not_viewed/followed"
   invalid_location: "invalid location '%{val}', expected: all/same_city/nearby"
