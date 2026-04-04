@@ -24,6 +24,8 @@ cli:
   location_help: "位置距离: all, same_city, nearby"
   creator_about: "探索创作者主页及其笔记。传入 'xhs explore' 或 'xhs search' 输出中的 profile URL。"
   url_help: "创作者主页 URL — 从 explore/search 的 profile 字段复制"
+  open_about: "在浏览器中打开 URL 并加载已保存的 Cookie。按 Ctrl+C 或 Ctrl+D 关闭。"
+  open_url_help: "要打开的 URL"
 
 auth:
   logged_in: "已登录"

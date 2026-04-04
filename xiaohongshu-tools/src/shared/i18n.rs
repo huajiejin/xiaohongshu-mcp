@@ -89,3 +89,9 @@ pub fn cli_creator_about() -> String {
 pub fn cli_url_help() -> String {
     t!("cli.url_help").to_string()
 }
+pub fn cli_open_about() -> String {
+    t!("cli.open_about").to_string()
+}
+pub fn cli_open_url_help() -> String {
+    t!("cli.open_url_help").to_string()
+}

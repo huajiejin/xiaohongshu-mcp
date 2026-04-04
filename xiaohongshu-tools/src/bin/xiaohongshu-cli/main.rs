@@ -2,6 +2,7 @@ use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 use xiaohongshu_tools::browser::human::ScrollSpeed;
+use xiaohongshu_tools::browser::{create_browser, create_page_with_cookies};
 use xiaohongshu_tools::commands::{creator, explore, search};
 use xiaohongshu_tools::shared::i18n;
 use xiaohongshu_tools::shared::output::{Format, Output};
@@ -92,6 +93,10 @@ enum Commands {
         #[arg(long)]
         duration: Option<u64>,
     },
+
+    Open {
+        url: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -142,6 +147,10 @@ fn build_command() -> clap::Command {
             .mut_arg("max_notes", |a| a.help(i18n::cli_max_notes_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
             .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
+    })
+    .mut_subcommand("open", |s| {
+        s.about(i18n::cli_open_about())
+            .mut_arg("url", |a| a.help(i18n::cli_open_url_help()))
     })
 }
 
@@ -268,6 +277,30 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
             out.result(&result);
+        }
+        Commands::Open { url } => {
+            let browser = create_browser(&opts).await?;
+            let page = create_page_with_cookies(&browser, &url).await?;
+            println!("{}", i18n::cli_open_about());
+
+            use tokio::io::AsyncReadExt;
+
+            let stdin_eof = async {
+                let mut buf = [0u8; 1];
+                let _ = tokio::io::stdin().read(&mut buf).await;
+            };
+
+            let browser_closed = xiaohongshu_tools::shared::utils::wait_for_page_close(
+                &page,
+                std::time::Duration::from_secs(2),
+            );
+
+            tokio::select! {
+                _ = stdin_eof => {}
+                _ = browser_closed => {}
+            }
+
+            std::process::exit(0);
         }
     }
 

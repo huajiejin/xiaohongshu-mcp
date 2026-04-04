@@ -68,6 +68,22 @@ pub fn open_file(path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub async fn wait_for_page_close(page: &Page, interval: Duration) {
+    let mut interval = tokio::time::interval(interval);
+    loop {
+        interval.tick().await;
+        match page.evaluate_expression("!!document.documentElement").await {
+            Ok(result) => {
+                let alive: bool = result.into_value().unwrap_or(false);
+                if !alive {
+                    break;
+                }
+            }
+            Err(_) => break,
+        }
+    }
+}
+
 pub struct ApiResponseWatcher {
     events: EventStream<EventResponseReceived>,
     url_contains: String,
