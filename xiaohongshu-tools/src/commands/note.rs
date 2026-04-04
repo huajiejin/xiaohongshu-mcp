@@ -1,6 +1,8 @@
 use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
-use crate::commands::support::{StagnationAction, StagnationTracker, StopCondition};
+use crate::commands::support::{
+    StagnationAction, StagnationTracker, StopCondition, click_show_more_buttons,
+};
 use crate::extract::note::{
     NoteDetail, NoteResult, check_note_page_accessible, extract_note_detail_map, parse_link_parts,
     parse_note_detail_raw,
@@ -241,45 +243,6 @@ async fn count_dom_comments(page: &chromiumoxide::page::Page) -> usize {
         .and_then(|v| v.into_value::<serde_json::Value>().ok())
         .and_then(|v| v.as_u64())
         .unwrap_or(0) as usize
-}
-
-async fn click_show_more_buttons(
-    page: &chromiumoxide::page::Page,
-    max_replies: usize,
-    human: &mut HumanBehavior,
-) {
-    let buttons = match page.find_elements(".show-more").await {
-        Ok(v) => v,
-        Err(_) => return,
-    };
-
-    let mut clicked = 0u32;
-    for btn in &buttons {
-        let text = btn.inner_text().await.ok().flatten().unwrap_or_default();
-        let reply_count = parse_reply_count_from_text(&text);
-        if reply_count > max_replies {
-            continue;
-        }
-
-        if let Err(e) = human.human_click(page, btn).await {
-            debug!("click show-more failed: {e}");
-            continue;
-        }
-        clicked += 1;
-        if clicked >= 6 {
-            break;
-        }
-    }
-
-    if clicked > 0 {
-        human.random_delay(human.config.read_time.clone()).await;
-    }
-}
-
-fn parse_reply_count_from_text(text: &str) -> usize {
-    text.split_whitespace()
-        .find_map(|part| part.parse::<usize>().ok())
-        .unwrap_or(0)
 }
 
 async fn scroll_comments(

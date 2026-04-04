@@ -1,3 +1,4 @@
+pub mod comment;
 pub mod creator;
 pub mod explore;
 pub mod interact;

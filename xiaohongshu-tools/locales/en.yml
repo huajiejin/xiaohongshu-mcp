@@ -34,6 +34,10 @@ cli:
   favorite_about: "Favorite a note"
   like_url_help: "Note URL — copy from explore/search output"
   undo_help: "Undo the action (unlike / unfavorite)"
+  comment_about: "Post a comment on a note"
+  reply_about: "Reply to a comment on a note"
+  comment_text_help: "Comment/reply text content"
+  comment_id_help: "Target comment ID (from 'xhs note' output)"
 
 auth:
   logged_in: "Logged in"
@@ -120,3 +124,12 @@ like:
   done: "%{action} succeeded for note %{note_id}"
   skipped: "%{action} skipped for note %{note_id} — already in target state"
   button_not_found: "Interaction button not found: %{error}"
+
+comment:
+  comment_done: "Comment posted on note %{note_id} (posted_comment_id: %{posted_comment_id})"
+  reply_done: "Reply posted on note %{note_id} to comment %{target_comment_id} (posted_comment_id: %{posted_comment_id})"
+  input_not_found: "Comment input not found: %{error}"
+  submit_not_found: "Submit button not found: %{error}"
+  reply_btn_not_found: "Reply button not found: %{error}"
+  comment_not_found: "Comment %{comment_id} not found after scrolling"
+  missing_comment_id: "comment_id is required for reply"

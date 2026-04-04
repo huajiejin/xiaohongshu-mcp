@@ -34,6 +34,10 @@ cli:
   favorite_about: "收藏笔记"
   like_url_help: "笔记 URL — 从 explore/search 输出中复制"
   undo_help: "撤销操作（取消点赞 / 取消收藏）"
+  comment_about: "发表评论"
+  reply_about: "回复评论"
+  comment_text_help: "评论/回复内容"
+  comment_id_help: "目标评论 ID（从 'xhs note' 输出中获取）"
 
 auth:
   logged_in: "已登录"
@@ -120,3 +124,12 @@ like:
   done: "笔记 %{note_id} %{action}成功"
   skipped: "笔记 %{note_id} %{action}跳过 — 已处于目标状态"
   button_not_found: "未找到交互按钮: %{error}"
+
+comment:
+  comment_done: "评论已发送到笔记 %{note_id} (posted_comment_id: %{posted_comment_id})"
+  reply_done: "回复已发送到笔记 %{note_id} 的评论 %{target_comment_id} (posted_comment_id: %{posted_comment_id})"
+  input_not_found: "未找到评论输入框: %{error}"
+  submit_not_found: "未找到提交按钮: %{error}"
+  reply_btn_not_found: "未找到回复按钮: %{error}"
+  comment_not_found: "滚动后仍未找到评论 %{comment_id}"
+  missing_comment_id: "回复操作需要指定 comment_id"

@@ -7,6 +7,8 @@ use std::collections::HashSet;
 use std::time::Instant;
 use tracing::{debug, warn};
 
+const SHOW_MORE_MAX_CLICKS: u32 = 6;
+
 pub struct StopCondition {
     max_items: usize,
     duration_secs: u64,
@@ -212,4 +214,43 @@ pub fn matches_keywords(text: &str, keywords: &[String]) -> bool {
     }
     let lower = text.to_lowercase();
     keywords.iter().any(|kw| lower.contains(&kw.to_lowercase()))
+}
+
+pub async fn click_show_more_buttons(
+    page: &chromiumoxide::page::Page,
+    max_replies: usize,
+    human: &mut HumanBehavior,
+) {
+    let buttons = match page.find_elements(".show-more").await {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let mut clicked = 0u32;
+    for btn in &buttons {
+        let text = btn.inner_text().await.ok().flatten().unwrap_or_default();
+        let reply_count = parse_reply_count_from_text(&text);
+        if reply_count > max_replies {
+            continue;
+        }
+
+        if let Err(e) = human.human_click(page, btn).await {
+            debug!("click show-more failed: {e}");
+            continue;
+        }
+        clicked += 1;
+        if clicked >= SHOW_MORE_MAX_CLICKS {
+            break;
+        }
+    }
+
+    if clicked > 0 {
+        human.random_delay(human.config.read_time.clone()).await;
+    }
+}
+
+pub fn parse_reply_count_from_text(text: &str) -> usize {
+    text.split_whitespace()
+        .find_map(|part| part.parse::<usize>().ok())
+        .unwrap_or(0)
 }

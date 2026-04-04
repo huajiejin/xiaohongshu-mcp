@@ -7,7 +7,7 @@ use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 use xiaohongshu_tools::browser::human::ScrollSpeed;
 use xiaohongshu_tools::browser::{create_browser, create_page_with_cookies};
-use xiaohongshu_tools::commands::{creator, explore, like, note, search};
+use xiaohongshu_tools::commands::{comment, creator, explore, like, note, search};
 use xiaohongshu_tools::shared::i18n;
 use xiaohongshu_tools::shared::output::{Format, Output};
 
@@ -137,6 +137,29 @@ enum Commands {
     Open {
         url: String,
     },
+
+    Comment {
+        url: String,
+
+        #[arg(long)]
+        text: String,
+
+        #[arg(long, default_value = "normal")]
+        scroll_speed: String,
+    },
+
+    Reply {
+        url: String,
+
+        #[arg(long)]
+        text: String,
+
+        #[arg(long)]
+        comment_id: String,
+
+        #[arg(long, default_value = "normal")]
+        scroll_speed: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -211,6 +234,19 @@ fn build_command() -> clap::Command {
     .mut_subcommand("open", |s| {
         s.about(i18n::cli_open_about())
             .mut_arg("url", |a| a.help(i18n::cli_open_url_help()))
+    })
+    .mut_subcommand("comment", |s| {
+        s.about(i18n::cli_comment_about())
+            .mut_arg("url", |a| a.help(i18n::cli_note_url_help()))
+            .mut_arg("text", |a| a.help(i18n::cli_comment_text_help()))
+            .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
+    })
+    .mut_subcommand("reply", |s| {
+        s.about(i18n::cli_reply_about())
+            .mut_arg("url", |a| a.help(i18n::cli_note_url_help()))
+            .mut_arg("text", |a| a.help(i18n::cli_comment_text_help()))
+            .mut_arg("comment_id", |a| a.help(i18n::cli_comment_id_help()))
+            .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
     })
 }
 
@@ -443,6 +479,45 @@ async fn run_command(
             }
 
             browser.close().await?;
+        }
+        Commands::Comment {
+            url,
+            text,
+            scroll_speed,
+        } => {
+            let speed: ScrollSpeed = scroll_speed.parse()?;
+            let result = comment::run(
+                &comment::CommentOptions {
+                    url,
+                    text,
+                    comment_id: None,
+                    scroll_speed: speed,
+                },
+                opts,
+                comment::CommentAction::Comment,
+            )
+            .await?;
+            out.result(&result);
+        }
+        Commands::Reply {
+            url,
+            text,
+            comment_id,
+            scroll_speed,
+        } => {
+            let speed: ScrollSpeed = scroll_speed.parse()?;
+            let result = comment::run(
+                &comment::CommentOptions {
+                    url,
+                    text,
+                    comment_id: Some(comment_id),
+                    scroll_speed: speed,
+                },
+                opts,
+                comment::CommentAction::Reply,
+            )
+            .await?;
+            out.result(&result);
         }
     }
 

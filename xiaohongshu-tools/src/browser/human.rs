@@ -1,5 +1,6 @@
 use crate::t;
 use anyhow::Result;
+use chromiumoxide::cdp::browser_protocol::input::InsertTextParams;
 use chromiumoxide::element::Element;
 use chromiumoxide::page::Page;
 use rand::rngs::StdRng;
@@ -205,6 +206,48 @@ impl HumanBehavior {
             .await?;
         self.random_delay(self.config.hover_time.clone()).await;
 
+        Ok(())
+    }
+
+    /// ASCII-only typing via per-character key dispatch. Use for standard keyboard input.
+    /// Panics on CJK/emoji — use `human_type_text` for Unicode content.
+    pub async fn human_type(&mut self, page: &Page, element: &Element, text: &str) -> Result<()> {
+        element.scroll_into_view().await?;
+        self.random_delay(self.config.reaction_time.clone()).await;
+
+        let point = element.clickable_point().await?;
+        page.move_mouse(point).await?;
+        self.random_delay(self.config.hover_time.clone()).await;
+
+        element.click().await?;
+        self.random_delay(self.config.human_delay.clone()).await;
+
+        element.type_str(text).await?;
+
+        self.random_delay(self.config.read_time.clone()).await;
+        Ok(())
+    }
+
+    /// Unicode-safe text insertion via CDP Input.insertText. Use for CJK, emoji, or mixed content.
+    pub async fn human_type_text(
+        &mut self,
+        page: &Page,
+        element: &Element,
+        text: &str,
+    ) -> Result<()> {
+        element.scroll_into_view().await?;
+        self.random_delay(self.config.reaction_time.clone()).await;
+
+        let point = element.clickable_point().await?;
+        page.move_mouse(point).await?;
+        self.random_delay(self.config.hover_time.clone()).await;
+
+        element.click().await?;
+        self.random_delay(self.config.human_delay.clone()).await;
+
+        page.execute(InsertTextParams::new(text)).await?;
+
+        self.random_delay(self.config.read_time.clone()).await;
         Ok(())
     }
 

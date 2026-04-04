@@ -119,3 +119,15 @@ pub fn cli_like_url_help() -> String {
 pub fn cli_undo_help() -> String {
     t!("cli.undo_help").to_string()
 }
+pub fn cli_comment_about() -> String {
+    t!("cli.comment_about").to_string()
+}
+pub fn cli_reply_about() -> String {
+    t!("cli.reply_about").to_string()
+}
+pub fn cli_comment_text_help() -> String {
+    t!("cli.comment_text_help").to_string()
+}
+pub fn cli_comment_id_help() -> String {
+    t!("cli.comment_id_help").to_string()
+}

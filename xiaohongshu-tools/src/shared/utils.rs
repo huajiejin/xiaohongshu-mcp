@@ -2,7 +2,7 @@ use crate::t;
 use anyhow::{Result, anyhow, bail};
 use base64::Engine;
 use chromiumoxide::cdp::browser_protocol::network::{
-    EnableParams as NetworkEnableParams, EventResponseReceived,
+    EnableParams as NetworkEnableParams, EventResponseReceived, GetResponseBodyParams,
 };
 use chromiumoxide::listeners::EventStream;
 use chromiumoxide::page::Page;
@@ -122,6 +122,56 @@ impl ApiResponseWatcher {
                     if event.response.url.contains(&url_contains) {
                         return Ok(());
                     }
+                }
+                Ok(None) | Err(_) => {
+                    bail!(
+                        "{}",
+                        t!(
+                            "utils.api_response_timeout",
+                            url = url_contains,
+                            timeout = format!("{:?}", timeout)
+                        )
+                    );
+                }
+            }
+        }
+    }
+
+    /// Wait for a matching response and return its parsed JSON body.
+    /// Uses CDP `Network.getResponseBody` to fetch the response content.
+    pub async fn wait_for_body(self, page: &Page, timeout: Duration) -> Result<serde_json::Value> {
+        let deadline = Instant::now() + timeout;
+        let mut events = self.events;
+        let url_contains = self.url_contains;
+
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                bail!(
+                    "{}",
+                    t!(
+                        "utils.api_response_timeout",
+                        url = url_contains,
+                        timeout = format!("{:?}", timeout)
+                    )
+                );
+            }
+
+            match tokio::time::timeout(remaining, events.next()).await {
+                Ok(Some(event)) => {
+                    if !event.response.url.contains(&url_contains) {
+                        continue;
+                    }
+
+                    let params = GetResponseBodyParams::builder()
+                        .request_id(event.request_id.clone())
+                        .build()
+                        .map_err(|e| anyhow!("build GetResponseBodyParams: {e}"))?;
+
+                    let result = page.execute(params).await?;
+                    let body: serde_json::Value =
+                        serde_json::from_str(&result.body).unwrap_or_default();
+                    return Ok(body);
                 }
                 Ok(None) | Err(_) => {
                     bail!(
