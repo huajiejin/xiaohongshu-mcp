@@ -279,7 +279,7 @@ async fn main() -> anyhow::Result<()> {
             out.result(&result);
         }
         Commands::Open { url } => {
-            let browser = create_browser(&opts).await?;
+            let mut browser = create_browser(&opts).await?;
             let page = create_page_with_cookies(&browser, &url).await?;
             println!("{}", i18n::cli_open_about());
 
@@ -300,6 +300,7 @@ async fn main() -> anyhow::Result<()> {
                 _ = browser_closed => {}
             }
 
+            browser.close().await?;
             std::process::exit(0);
         }
     }
