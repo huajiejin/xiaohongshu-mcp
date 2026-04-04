@@ -95,7 +95,7 @@ pub async fn run(
                 .comment_id
                 .as_deref()
                 .ok_or_else(|| anyhow!("{}", t!("comment.missing_comment_id")))?;
-            post_reply(&page, comment_id, &opts.text, opts.scroll_speed, &mut human).await?
+            post_reply(&page, comment_id, &opts.text, &mut human).await?
         }
     }
 
@@ -163,13 +163,12 @@ async fn post_reply(
     page: &Page,
     comment_id: &str,
     text: &str,
-    scroll_speed: ScrollSpeed,
     human: &mut HumanBehavior,
 ) -> Result<()> {
     scroll_to_comments_area(page).await;
     human.random_delay(human.config.human_delay.clone()).await;
 
-    let comment_el = find_comment_element(page, comment_id, scroll_speed, human).await?;
+    let comment_el = find_comment_element(page, comment_id, human).await?;
 
     let reply_btn = comment_el
         .find_element(".right .interactions .reply")
@@ -203,7 +202,6 @@ async fn click_submit(page: &Page, human: &mut HumanBehavior) -> Result<()> {
 async fn find_comment_element(
     page: &Page,
     comment_id: &str,
-    scroll_speed: ScrollSpeed,
     human: &mut HumanBehavior,
 ) -> Result<chromiumoxide::element::Element> {
     let direct_selector = format!("#comment-{comment_id}");
@@ -221,7 +219,7 @@ async fn find_comment_element(
         return Ok(el);
     }
 
-    let max_attempts = 10;
+    let max_attempts = 100;
     let mut prev_count = 0usize;
     let mut stagnation = StagnationTracker::for_comments();
 
@@ -247,16 +245,18 @@ async fn find_comment_element(
             StagnationAction::Sprint => {
                 debug!("stagnation sprint while searching comment");
                 for _ in 0..10 {
-                    let _ = human.scroll_page(page, scroll_speed).await;
+                    scroll_note_container(page, 800).await;
                     let _ = human.smart_scroll(page, 600).await;
+                    human.random_delay(human.config.scroll_wait.clone()).await;
                 }
                 stagnation.reset();
                 continue;
             }
             StagnationAction::Escalate => {
                 for _ in 0..3 {
-                    let _ = human.scroll_page(page, scroll_speed).await;
+                    scroll_note_container(page, 800).await;
                     let _ = human.smart_scroll(page, 800).await;
+                    human.random_delay(human.config.scroll_wait.clone()).await;
                 }
                 continue;
             }
@@ -264,7 +264,7 @@ async fn find_comment_element(
             StagnationAction::Continue => {}
         }
 
-        let _ = human.scroll_page(page, scroll_speed).await;
+        scroll_note_container(page, 600).await;
         let _ = human.smart_scroll(page, 600).await;
         human.random_delay(human.config.human_delay.clone()).await;
     }
@@ -273,6 +273,18 @@ async fn find_comment_element(
         "{}",
         t!("comment.comment_not_found", comment_id = comment_id)
     ))
+}
+
+async fn scroll_note_container(page: &Page, delta: i64) {
+    let js = format!(
+        r#"(() => {{
+            const el = document.querySelector('.note-scroller')
+                || document.querySelector('.interaction-container')
+                || document.documentElement;
+            el.scrollBy({{top: {delta}, behavior: 'smooth'}});
+        }})()"#
+    );
+    let _ = page.evaluate_expression(&js).await;
 }
 
 async fn scroll_to_comments_area(page: &Page) {
