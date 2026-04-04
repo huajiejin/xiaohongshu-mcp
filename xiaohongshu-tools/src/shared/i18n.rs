@@ -95,3 +95,15 @@ pub fn cli_open_about() -> String {
 pub fn cli_open_url_help() -> String {
     t!("cli.open_url_help").to_string()
 }
+pub fn cli_note_about() -> String {
+    t!("cli.note_about").to_string()
+}
+pub fn cli_note_url_help() -> String {
+    t!("cli.note_url_help").to_string()
+}
+pub fn cli_max_comments_help() -> String {
+    t!("cli.max_comments_help").to_string()
+}
+pub fn cli_max_replies_help() -> String {
+    t!("cli.max_replies_help").to_string()
+}

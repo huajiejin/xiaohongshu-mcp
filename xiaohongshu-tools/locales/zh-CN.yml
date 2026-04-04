@@ -26,6 +26,10 @@ cli:
   url_help: "创作者主页 URL — 从 explore/search 的 profile 字段复制"
   open_about: "在浏览器中打开 URL 并加载已保存的 Cookie。按 Ctrl+C 关闭。"
   open_url_help: "要打开的 URL"
+  note_about: "获取笔记详情及评论"
+  note_url_help: "笔记 URL — 从 explore/search 输出中复制"
+  max_comments_help: "最多加载的评论数 (0 = 不滚动加载, 默认: 20)"
+  max_replies_help: "每条评论最多展开的子回复数 (默认: 10)"
 
 auth:
   logged_in: "已登录"
@@ -92,3 +96,18 @@ creator:
   note_line: "%{index}. %{title} | %{note_type} | %{id}"
   wait_initial_state_timeout: "等待创作者主页加载超时"
   invalid_url: "无效的创作者主页 URL — 格式: https://www.xiaohongshu.com/user/profile/<user_id>?xsec_token=..."
+
+note:
+  header: "类型: %{note_type} | 创作者: %{creator} (@%{creator_id})"
+  images_count: "图片 (%{count}):"
+  video_url: "视频: %{url}"
+  engagement: "点赞: %{liked} | 收藏: %{collected} | 评论: %{comments} | 分享: %{shared}"
+  comments_summary: "评论 (%{loaded} 条已加载%{more}):"
+  comment_line: "%{index}. %{user}: %{content} (%{likes} 赞)%{ip}%{tags}"
+  sub_comment_line: "└─ %{user}: %{content} (%{likes} 赞)"
+  has_more: "，还有更多"
+  footer: "用时 %{time} 秒（采集时间: %{collected_at}）"
+  not_found: "笔记未找到或无法访问"
+  invalid_url: "无效的笔记 URL — 格式: https://www.xiaohongshu.com/explore/<note_id>?xsec_token=..."
+  page_blocked: "笔记无法访问: %{reason}"
+  wait_timeout: "等待笔记页面加载超时"

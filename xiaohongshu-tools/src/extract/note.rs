@@ -44,11 +44,11 @@ pub enum ExtractionRoot {
 }
 
 impl ExtractionRoot {
-    fn xsec_source(&self) -> &'static str {
+    const fn xsec_source(&self) -> &'static str {
         match self {
-            ExtractionRoot::Explore => XSEC_SOURCE_PC_FEED,
-            ExtractionRoot::Search => XSEC_SOURCE_PC_SEARCH,
-            ExtractionRoot::UserProfile => XSEC_SOURCE_PC_USER,
+            Self::Explore => XSEC_SOURCE_PC_FEED,
+            Self::Search => XSEC_SOURCE_PC_SEARCH,
+            Self::UserProfile => XSEC_SOURCE_PC_USER,
         }
     }
 }
@@ -679,6 +679,528 @@ fn value_to_text(value: &serde_json::Value) -> Option<String> {
         return Some(n.to_string());
     }
     None
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct NoteImage {
+    pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub height: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub live_photo: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct CommentRaw {
+    pub id: Option<String>,
+    pub note_id: Option<String>,
+    pub content: Option<String>,
+    pub like_count: Option<String>,
+    pub create_time: Option<String>,
+    pub ip_location: Option<String>,
+    pub liked: Option<bool>,
+    pub user_name: Option<String>,
+    pub user_id: Option<String>,
+    pub user_avatar: Option<String>,
+    pub sub_comment_count: Option<String>,
+    pub sub_comments: Vec<CommentRaw>,
+    pub show_tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Comment {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note_id: Option<String>,
+    pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub like_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub create_time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ip_location: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub liked: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_avatar: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub_comment_count: Option<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub sub_comments: Vec<Comment>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub show_tags: Vec<String>,
+}
+
+impl Comment {
+    pub fn from_raw(raw: &CommentRaw) -> Self {
+        Self {
+            id: raw.id.clone().unwrap_or_default(),
+            note_id: raw.note_id.clone(),
+            content: raw.content.clone().unwrap_or_default(),
+            like_count: raw.like_count.as_deref().and_then(parse_count),
+            create_time: raw.create_time.as_deref().and_then(parse_timestamp_ms),
+            ip_location: raw.ip_location.clone(),
+            liked: raw.liked,
+            user_name: raw.user_name.clone(),
+            user_id: raw.user_id.clone(),
+            user_avatar: raw.user_avatar.clone(),
+            sub_comment_count: raw.sub_comment_count.as_deref().and_then(parse_count),
+            sub_comments: raw.sub_comments.iter().map(Self::from_raw).collect(),
+            show_tags: raw.show_tags.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct NoteDetailRaw {
+    pub note_id: Option<String>,
+    pub xsec_token: Option<String>,
+    pub title: Option<String>,
+    pub desc: Option<String>,
+    pub note_type: Option<String>,
+    pub time: Option<String>,
+    pub ip_location: Option<String>,
+    pub creator_id: Option<String>,
+    pub creator_xsec_token: Option<String>,
+    pub creator_name: Option<String>,
+    pub creator_avatar: Option<String>,
+    pub liked: Option<bool>,
+    pub liked_count: Option<String>,
+    pub collected: Option<bool>,
+    pub collected_count: Option<String>,
+    pub comment_count: Option<String>,
+    pub shared_count: Option<String>,
+    pub images: Vec<NoteImage>,
+    pub comments: Vec<CommentRaw>,
+    pub comments_cursor: Option<String>,
+    pub comments_has_more: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct NoteDetail {
+    pub note_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub xsec_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub desc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub publish_time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ip_location: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator_xsec_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator_avatar: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub liked: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub liked_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub collected: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub collected_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shared_count: Option<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub images: Vec<NoteImage>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video_url: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub comments: Vec<Comment>,
+    pub comments_loaded: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comments_has_more: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note_url: Option<String>,
+}
+
+impl NoteDetail {
+    pub fn from_raw(raw: &NoteDetailRaw) -> Self {
+        let comments: Vec<Comment> = raw.comments.iter().map(Comment::from_raw).collect();
+        let comments_loaded = comments.len();
+        Self {
+            note_id: raw.note_id.clone().unwrap_or_default(),
+            xsec_token: raw.xsec_token.clone(),
+            title: raw.title.clone(),
+            desc: raw.desc.clone(),
+            note_type: raw.note_type.clone(),
+            publish_time: raw.time.as_deref().and_then(parse_timestamp_ms),
+            ip_location: raw.ip_location.clone(),
+            creator_id: raw.creator_id.clone(),
+            creator_xsec_token: raw.creator_xsec_token.clone(),
+            creator_name: raw.creator_name.clone(),
+            creator_avatar: raw.creator_avatar.clone(),
+            liked: raw.liked,
+            liked_count: raw.liked_count.as_deref().and_then(parse_count),
+            collected: raw.collected,
+            collected_count: raw.collected_count.as_deref().and_then(parse_count),
+            comment_count: raw.comment_count.as_deref().and_then(parse_count),
+            shared_count: raw.shared_count.as_deref().and_then(parse_count),
+            images: raw.images.clone(),
+            video_url: None,
+            comments,
+            comments_loaded,
+            comments_has_more: raw.comments_has_more,
+            note_url: None,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct NoteResult {
+    pub detail: NoteDetail,
+    pub duration_secs: f64,
+    pub collected_at: String,
+}
+
+impl fmt::Display for NoteResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let d = &self.detail;
+        let title = d.title.as_deref().unwrap_or("-");
+        let note_type = d.note_type.as_deref().unwrap_or("-");
+        let creator = d.creator_name.as_deref().unwrap_or("-");
+        let creator_id = d.creator_id.as_deref().unwrap_or("-");
+
+        writeln!(f, "{}", title)?;
+        writeln!(
+            f,
+            "{}",
+            t!(
+                "note.header",
+                note_type = note_type,
+                creator = creator,
+                creator_id = creator_id,
+            )
+        )?;
+
+        if let Some(pt) = &d.publish_time {
+            let ip = d
+                .ip_location
+                .as_deref()
+                .map(|ip| format!(" [{ip}]"))
+                .unwrap_or_default();
+            writeln!(f, "{pt}{ip}")?;
+        }
+
+        if !d.images.is_empty() {
+            writeln!(f, "{}", t!("note.images_count", count = d.images.len()))?;
+            for (i, img) in d.images.iter().enumerate() {
+                let dims = match (img.width, img.height) {
+                    (Some(w), Some(h)) => format!(" ({w}x{h})"),
+                    _ => String::new(),
+                };
+                writeln!(f, "  {}. {url}{dims}", i + 1, url = img.url)?;
+            }
+        }
+
+        if let Some(vurl) = &d.video_url {
+            writeln!(f, "{}", t!("note.video_url", url = vurl))?;
+        }
+
+        if let Some(desc) = &d.desc
+            && !desc.is_empty()
+        {
+            writeln!(f)?;
+            for line in desc.lines() {
+                writeln!(f, "{line}")?;
+            }
+        }
+
+        writeln!(f)?;
+        writeln!(
+            f,
+            "{}",
+            t!(
+                "note.engagement",
+                liked = d.liked_count.unwrap_or(0),
+                collected = d.collected_count.unwrap_or(0),
+                comments = d.comment_count.unwrap_or(0),
+                shared = d.shared_count.unwrap_or(0),
+            )
+        )?;
+
+        if !d.comments.is_empty() {
+            let more = if d.comments_has_more.unwrap_or(false) {
+                t!("note.has_more").to_string()
+            } else {
+                String::new()
+            };
+            writeln!(
+                f,
+                "{}",
+                t!(
+                    "note.comments_summary",
+                    loaded = d.comments_loaded,
+                    more = more,
+                )
+            )?;
+            for (i, c) in d.comments.iter().enumerate() {
+                let name = c.user_name.as_deref().unwrap_or("-");
+                let likes = c.like_count.unwrap_or(0);
+                let ip = c
+                    .ip_location
+                    .as_deref()
+                    .map(|ip| format!(" [{ip}]"))
+                    .unwrap_or_default();
+                let tags = if c.show_tags.is_empty() {
+                    String::new()
+                } else {
+                    format!(" [{}]", c.show_tags.join(","))
+                };
+                writeln!(
+                    f,
+                    "  {}",
+                    t!(
+                        "note.comment_line",
+                        index = i + 1,
+                        user = name,
+                        content = &c.content,
+                        likes = likes,
+                        ip = ip,
+                        tags = tags,
+                    )
+                )?;
+                for sc in &c.sub_comments {
+                    let sname = sc.user_name.as_deref().unwrap_or("-");
+                    let slikes = sc.like_count.unwrap_or(0);
+                    writeln!(
+                        f,
+                        "    {}",
+                        t!(
+                            "note.sub_comment_line",
+                            user = sname,
+                            content = &sc.content,
+                            likes = slikes,
+                        )
+                    )?;
+                }
+            }
+        }
+
+        writeln!(
+            f,
+            "{}",
+            t!(
+                "note.footer",
+                time = format!("{:.1}", self.duration_secs),
+                collected_at = &self.collected_at,
+            )
+        )?;
+
+        Ok(())
+    }
+}
+
+pub async fn extract_note_detail_map(page: &Page) -> Result<serde_json::Value> {
+    let js = r#"(() => {
+        const s = window.__INITIAL_STATE__;
+        if (!s) return null;
+        const get_val = (o) => o?.value || o?._value || o?._rawValue;
+        const note = get_val(s?.note) || s?.note;
+        const detailMap = get_val(note?.noteDetailMap) || note?.noteDetailMap;
+        if (!detailMap || typeof detailMap !== 'object') return null;
+        return JSON.parse(JSON.stringify(detailMap));
+    })()"#;
+
+    let result = page.evaluate_expression(js).await?;
+    match result.value() {
+        Some(v) if !v.is_null() => Ok(v.clone()),
+        _ => anyhow::bail!("{}", t!("extractor.initial_state_null")),
+    }
+}
+
+pub fn parse_note_detail_raw(
+    detail_map: &serde_json::Value,
+    note_id: &str,
+) -> Option<NoteDetailRaw> {
+    let entry = detail_map.get(note_id)?;
+    let note = entry.get("note")?;
+    let comments_data = entry.get("comments");
+
+    let user = note.get("user");
+    let interact = note.get("interactInfo");
+
+    Some(NoteDetailRaw {
+        note_id: str_field(note, "noteId"),
+        xsec_token: str_field(note, "xsecToken"),
+        title: str_field(note, "title"),
+        desc: str_field(note, "desc"),
+        note_type: str_field(note, "type"),
+        time: note
+            .get("time")
+            .and_then(serde_json::Value::as_i64)
+            .map(|t| t.to_string()),
+        ip_location: str_field(note, "ipLocation"),
+        creator_id: user.and_then(|u| str_field(u, "userId")),
+        creator_xsec_token: user.and_then(|u| str_field(u, "xsecToken")),
+        creator_name: user
+            .and_then(|u| str_field(u, "nickname").or_else(|| str_field(u, "nickName"))),
+        creator_avatar: user.and_then(|u| str_field(u, "avatar")),
+        liked: interact.and_then(|i| i.get("liked").and_then(serde_json::Value::as_bool)),
+        liked_count: interact
+            .and_then(|i| i.get("likedCount"))
+            .and_then(value_to_text),
+        collected: interact.and_then(|i| i.get("collected").and_then(serde_json::Value::as_bool)),
+        collected_count: interact
+            .and_then(|i| i.get("collectedCount"))
+            .and_then(value_to_text),
+        comment_count: interact
+            .and_then(|i| i.get("commentCount"))
+            .and_then(value_to_text),
+        shared_count: interact
+            .and_then(|i| i.get("sharedCount"))
+            .and_then(value_to_text),
+        images: parse_image_list(note.get("imageList")),
+        comments: comments_data
+            .and_then(|c| c.get("list"))
+            .and_then(|l| l.as_array())
+            .map(|arr| arr.iter().filter_map(parse_comment_raw).collect())
+            .unwrap_or_default(),
+        comments_cursor: comments_data.and_then(|c| str_field(c, "cursor")),
+        comments_has_more: comments_data
+            .and_then(|c| c.get("hasMore"))
+            .and_then(serde_json::Value::as_bool),
+    })
+}
+
+fn parse_image_list(image_list: Option<&serde_json::Value>) -> Vec<NoteImage> {
+    let arr = match image_list.and_then(serde_json::Value::as_array) {
+        Some(a) => a,
+        None => return Vec::new(),
+    };
+
+    arr.iter()
+        .filter_map(|item| {
+            let url = ["urlDefault", "urlPre"].iter().find_map(|key| {
+                item.get(*key)
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+            })?;
+            Some(NoteImage {
+                url: url.to_string(),
+                width: item.get("width").and_then(serde_json::Value::as_u64),
+                height: item.get("height").and_then(serde_json::Value::as_u64),
+                live_photo: item.get("livePhoto").and_then(serde_json::Value::as_bool),
+            })
+        })
+        .collect()
+}
+
+fn parse_comment_raw(value: &serde_json::Value) -> Option<CommentRaw> {
+    let id = str_field(value, "id");
+    let content = str_field(value, "content");
+
+    if id.is_none() && content.is_none() {
+        return None;
+    }
+
+    let user_info = value.get("userInfo");
+
+    Some(CommentRaw {
+        id,
+        note_id: str_field(value, "noteId"),
+        content,
+        like_count: value.get("likeCount").and_then(value_to_text),
+        create_time: value
+            .get("createTime")
+            .and_then(serde_json::Value::as_i64)
+            .map(|t| t.to_string()),
+        ip_location: str_field(value, "ipLocation"),
+        liked: value.get("liked").and_then(serde_json::Value::as_bool),
+        user_name: user_info
+            .and_then(|u| str_field(u, "nickname").or_else(|| str_field(u, "nickName"))),
+        user_id: user_info.and_then(|u| str_field(u, "userId")),
+        user_avatar: user_info.and_then(|u| str_field(u, "avatar")),
+        sub_comment_count: value.get("subCommentCount").and_then(value_to_text),
+        sub_comments: value
+            .get("subComments")
+            .and_then(serde_json::Value::as_array)
+            .map(|arr| arr.iter().filter_map(parse_comment_raw).collect())
+            .unwrap_or_default(),
+        show_tags: value
+            .get("showTags")
+            .and_then(serde_json::Value::as_array)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default(),
+    })
+}
+
+fn str_field(parent: &serde_json::Value, key: &str) -> Option<String> {
+    parent
+        .get(key)
+        .and_then(serde_json::Value::as_str)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+}
+
+pub async fn extract_video_url_from_dom(page: &Page) -> Result<Option<String>> {
+    let js = r#"(() => {
+        const video = document.querySelector('video');
+        if (!video) return null;
+        return video.src || video.querySelector('source')?.src || null;
+    })()"#;
+
+    let result = page.evaluate_expression(js).await?;
+    match result.value() {
+        Some(serde_json::Value::String(s)) if !s.is_empty() => Ok(Some(s.clone())),
+        _ => Ok(None),
+    }
+}
+
+fn parse_timestamp_ms(raw: &str) -> Option<String> {
+    let ms: i64 = raw.parse().ok()?;
+    let secs = if ms > 1_000_000_000_000 {
+        ms / 1000
+    } else {
+        ms
+    };
+    chrono::DateTime::from_timestamp(secs, 0)
+        .map(|dt| dt.naive_local().format("%Y-%m-%dT%H:%M:%S").to_string())
+}
+
+pub async fn check_note_page_accessible(page: &Page) -> Result<()> {
+    let js = r#"(() => {
+        const body = document.body?.innerText || '';
+        const checks = [
+            {text: '笔记已删除', reason: 'deleted'},
+            {text: '笔记无法查看', reason: 'private'},
+            {text: '笔记违规', reason: 'violation'},
+            {text: '该笔记已失效', reason: 'expired'},
+            {text: '内容不可见', reason: 'invisible'},
+            {text: '该内容因违规', reason: 'violation'},
+        ];
+        for (const c of checks) {
+            if (body.includes(c.text)) return c.reason;
+        }
+        return null;
+    })()"#;
+
+    let result = page.evaluate_expression(js).await?;
+    if let Some(reason) = result.value().and_then(serde_json::Value::as_str) {
+        anyhow::bail!("{}", t!("note.page_blocked", reason = reason));
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

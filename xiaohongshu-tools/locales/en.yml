@@ -26,6 +26,10 @@ cli:
   url_help: "Creator profile URL — copy from explore/search profile field"
   open_about: "Open a URL in the browser with loaded cookies. Press Ctrl+C to close."
   open_url_help: "URL to open"
+  note_about: "Get note detail with comments"
+  note_url_help: "Note URL — copy from explore/search output"
+  max_comments_help: "Max top-level comments to load (0 = skip scrolling, default: 20)"
+  max_replies_help: "Max sub-replies to expand per comment (default: 10)"
 
 auth:
   logged_in: "Logged in"
@@ -92,3 +96,18 @@ creator:
   note_line: "%{index}. %{title} | %{note_type} | %{id}"
   wait_initial_state_timeout: "timed out waiting for creator page to load"
   invalid_url: "invalid creator URL — expected format: https://www.xiaohongshu.com/user/profile/<user_id>?xsec_token=..."
+
+note:
+  header: "Type: %{note_type} | Creator: %{creator} (@%{creator_id})"
+  images_count: "Images (%{count}):"
+  video_url: "Video: %{url}"
+  engagement: "Liked: %{liked} | Collected: %{collected} | Comments: %{comments} | Shared: %{shared}"
+  comments_summary: "Comments (%{loaded} loaded%{more}):"
+  comment_line: "%{index}. %{user}: %{content} (%{likes} likes)%{ip}%{tags}"
+  sub_comment_line: "└─ %{user}: %{content} (%{likes} likes)"
+  has_more: ", has more"
+  footer: "Collected in %{time}s (at %{collected_at})"
+  not_found: "Note not found or inaccessible"
+  invalid_url: "Invalid note URL — expected format: https://www.xiaohongshu.com/explore/<note_id>?xsec_token=..."
+  page_blocked: "Note is not accessible: %{reason}"
+  wait_timeout: "Timed out waiting for note page to load"

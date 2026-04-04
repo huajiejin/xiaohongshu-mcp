@@ -7,7 +7,7 @@ use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 use xiaohongshu_tools::browser::human::ScrollSpeed;
 use xiaohongshu_tools::browser::{create_browser, create_page_with_cookies};
-use xiaohongshu_tools::commands::{creator, explore, search};
+use xiaohongshu_tools::commands::{creator, explore, note, search};
 use xiaohongshu_tools::shared::i18n;
 use xiaohongshu_tools::shared::output::{Format, Output};
 
@@ -98,6 +98,22 @@ enum Commands {
         duration: Option<u64>,
     },
 
+    Note {
+        url: String,
+
+        #[arg(long, default_value_t = 10)]
+        max_comments: usize,
+
+        #[arg(long, default_value_t = 10)]
+        max_replies: usize,
+
+        #[arg(long, default_value = "normal")]
+        scroll_speed: String,
+
+        #[arg(long, default_value_t = 10)]
+        duration: u64,
+    },
+
     Open {
         url: String,
     },
@@ -149,6 +165,14 @@ fn build_command() -> clap::Command {
         s.about(i18n::cli_creator_about())
             .mut_arg("url", |a| a.help(i18n::cli_url_help()))
             .mut_arg("max_notes", |a| a.help(i18n::cli_max_notes_help()))
+            .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
+            .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
+    })
+    .mut_subcommand("note", |s| {
+        s.about(i18n::cli_note_about())
+            .mut_arg("url", |a| a.help(i18n::cli_note_url_help()))
+            .mut_arg("max_comments", |a| a.help(i18n::cli_max_comments_help()))
+            .mut_arg("max_replies", |a| a.help(i18n::cli_max_replies_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
             .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
     })
@@ -320,6 +344,27 @@ async fn run_command(
                 },
                 opts,
                 &token,
+            )
+            .await?;
+            out.result(&result);
+        }
+        Commands::Note {
+            url,
+            max_comments,
+            max_replies,
+            scroll_speed,
+            duration,
+        } => {
+            let speed: ScrollSpeed = scroll_speed.parse()?;
+            let result = note::run(
+                &note::NoteOptions {
+                    url,
+                    max_comments,
+                    max_replies,
+                    scroll_speed: speed,
+                    duration,
+                },
+                opts,
             )
             .await?;
             out.result(&result);

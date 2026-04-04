@@ -1,6 +1,6 @@
 # HANDOFF.md — xiaohongshu-tools Development Context
 
-> Last updated after author→creator rename across all commands
+> Last updated after `xhs note` command implementation
 
 ### New Findings (Before Refactor Work)
 
@@ -251,12 +251,92 @@ Renamed all `author` references to `creator` across the entire codebase:
 - Fixed 6 clippy nursery warnings (redundant clones, option_if_let_else, or_fun_call)
 - All 10 tests pass, zero clippy warnings
 
+### Batch 14: `xhs note` Command (Note Detail + Comments)
+
+**`src/extract/note.rs`** — New structs and extraction:
+- `NoteImage` struct: `url`, `width`, `height`, `live_photo`
+- `CommentRaw` struct: raw comment from `__INITIAL_STATE__` with recursive `sub_comments`
+- `Comment` struct: normalized (parsed counts, formatted timestamps) with `from_raw()`
+- `NoteDetailRaw` struct: raw note detail from `__INITIAL_STATE__.note.noteDetailMap[note_id]`
+- `NoteDetail` struct: normalized detail with `from_raw()`
+- `NoteResult` struct: command result wrapper with `Display` impl for text output
+- `extract_note_detail_map()`: new JS extraction for `window.__INITIAL_STATE__.note.noteDetailMap`
+- `parse_note_detail_raw()`: parses JSON into `NoteDetailRaw` (note fields + comments + images)
+- `parse_image_list()`: extracts images from `imageList` array (prefers `urlDefault` → `urlPre`)
+- `parse_comment_raw()`: parses recursive comment tree from JSON
+- `extract_video_url_from_dom()`: queries `<video>` element for `src` — Rust advantage over Go
+- `check_note_page_accessible()`: detects deleted/private/violation/blocked notes via DOM text
+- `parse_timestamp_ms()`: converts Unix ms timestamps to ISO datetime strings
+- `str_field()`: helper for extracting optional non-empty string fields from JSON
+
+**`src/commands/note.rs`** — New command (290 lines):
+- `NoteOptions`: `url`, `max_comments` (default 20), `max_replies` (default 10), `scroll_speed`, `duration` (default 120s)
+- `run()`: parse URL → navigate → check accessibility → extract detail → extract video URL → optional comment loading → return `NoteResult`
+- Comment loading loop (`load_comments()`):
+  - Scrolls to comments area (`.comments-container`)
+  - Detects no-comments marker ("荒地")
+  - Detects end-of-comments marker ("THE END")
+  - Clicks "show more" buttons for sub-replies (respects `max_replies` threshold)
+  - Stagnation detection with progressive escalation (large scroll at 5, big sprint at 20)
+  - Re-reads `__INITIAL_STATE__` after scrolling for final comment state
+- DOM helper functions: `count_dom_comments`, `check_end_container`, `check_no_comments`, `scroll_to_comments_area`, `scroll_comments`
+- `wait_note_page()`: polls for `noteDetailMap` availability in `__INITIAL_STATE__`
+
+**`src/extract/mod.rs`** — Updated exports for new types and functions
+
+**`src/commands/mod.rs`** — Added `pub mod note`
+
+**`src/bin/xiaohongshu-cli/main.rs`** — Added `Note` subcommand:
+- `xhs note <url>` with `--max_comments`, `--max_replies`, `--scroll_speed`, `--duration`
+- CLI help via i18n helpers
+
+**`src/shared/i18n.rs`** — Added helpers: `cli_note_about`, `cli_note_url_help`, `cli_max_comments_help`, `cli_max_replies_help`
+
+**`locales/en.yml`** + **`locales/zh-CN.yml`** — New `note:` section with 13 keys for Display output and error messages
+
+**Also fixed** pre-existing clippy warnings: `or_fun_call` in creator.rs, `use_self` + `missing_const_for_fn` in ExtractionRoot
+
+All 26 tests pass, zero clippy warnings (including `-W clippy::nursery`).
+
 ### Remaining follow-up work (next session)
 
 - Add optional count normalization helpers (e.g. `1.2w` -> numeric) if downstream consumers need numeric sorting.
-- `xhs feed <note_id>` — note detail with comments
-- `xhs like <note_id>` / `xhs favorite <note_id>`
-- `xhs comment <note_id> <text>`
+
+### Go Competitor Gap Analysis (all 13 MCP tools audited)
+
+Go competitor has **13 registered MCP tools** (`mcp_server.go`). Rust CLI currently covers 7 (auth login/logout/status, explore, search, creator, note).
+
+**Already implemented in Rust (4/13):**
+
+| Go Tool | Rust CLI | Status |
+|---|---|---|
+| `check_login_status` | `xhs auth status` | Done |
+| `get_login_qrcode` | `xhs auth login` | Done |
+| `delete_cookies` | `xhs auth logout` | Done |
+| `list_feeds` | `xhs explore` | Done |
+| `search_feeds` | `xhs search` | Done |
+| `user_profile` | `xhs creator` | Done |
+| `get_feed_detail` | `xhs note` | Done |
+
+**Missing — ranked by priority:**
+
+| # | Go Tool | Feature | Impact | Complexity | Build Order |
+|---|---|---|---|---|---|
+| 1 | `like_feed` | Like/unlike a note (idempotent) | MEDIUM | Low | **1st** |
+| 2 | `favorite_feed` | Favorite/unfavorite a note (idempotent) | MEDIUM | Low | **1st** |
+| 3 | `post_comment_to_feed` | Post top-level comment on a note | MEDIUM | Low | **2nd** |
+| 4 | `reply_comment_in_feed` | Reply to an existing comment | MEDIUM | Low | **2nd** |
+| 5 | `publish_content` | Publish image+text note (tags, scheduling, visibility, product binding) | HIGH | High | **3rd** |
+| 6 | `publish_with_video` | Publish video note (tags, scheduling, visibility, product binding) | HIGH | High | **3rd** |
+
+**Go also has a REST-only `/api/v1/user/me` endpoint** (not an MCP tool) for fetching the logged-in user's own profile. Low priority.
+
+### Recommended build order
+
+1. ~~**`xhs note <url>`** — done (Batch 14)~~
+2. **`xhs like` + `xhs favorite`** — simple click actions, reuse navigation from note. Go makes these idempotent (skip if already in desired state).
+3. **`xhs comment` + `xhs reply`** — text input interactions on note detail page.
+4. **`xhs publish` (image+text) + `xhs publish` (video)** — most complex (file uploads, form filling, scheduling).
 
 ## Current Architecture
 
@@ -273,8 +353,8 @@ src/
 │   ├── flow.rs                  # Auth flows: login (QR scan), logout, status check
 │   └── login_image.rs           # QR code image extraction and display
 ├── extract/
-│   ├── mod.rs                   # Re-exports: NoteCard, ExtractionRoot, extract_* functions
-│   └── note.rs                  # __INITIAL_STATE__ JS eval + note card extraction + DOM fallback
+│   ├── mod.rs                   # Re-exports: NoteCard, NoteDetail, ExtractionRoot, extract_* functions
+│   └── note.rs                  # __INITIAL_STATE__ JS eval + note card/detail extraction + DOM fallback
 ├── shared/
 │   ├── mod.rs                   # Re-exports: Format, Output, RetryConfig, etc.
 │   ├── i18n.rs                  # Locale detection + CLI help string helpers
@@ -285,7 +365,8 @@ src/
 │   ├── mod.rs                   # Re-exports command submodules
 │   ├── explore.rs               # Explore discover feed with filtering and interaction
 │   ├── search.rs                # Search with filters (sort, type, time, scope, location)
-│   └── creator.rs               # Creator profile exploration (accepts profile URL)
+│   ├── creator.rs               # Creator profile exploration (accepts profile URL)
+│   └── note.rs                  # Note detail with comments (scroll loading, sub-reply expansion)
 └── bin/
     └── xiaohongshu-cli/
         └── main.rs              # CLI entry point (clap), --format, --headless, --proxy
@@ -318,23 +399,33 @@ xhs creator "https://www.xiaohongshu.com/user/profile/<user_id>?xsec_token=<toke
 xhs creator "<url>" --max_posts 10       # Limit creator posts
 xhs creator "<url>" --duration 60        # Time-limited collection
 
+xhs note "https://www.xiaohongshu.com/explore/<note_id>?xsec_token=<token>&xsec_source=pc_feed"
+xhs note "<url>" --max_comments 50       # Load up to 50 top-level comments
+xhs note "<url>" --max_replies 5         # Expand sub-replies up to 5 per comment
+xhs note "<url>" --max_comments 0        # Skip comment scrolling (return initial batch only)
+xhs note "<url>" --scroll_speed slow     # Scroll speed for comment loading
+xhs note "<url>" --duration 60           # Max seconds to spend collecting
+
 xhs --format json auth status           # JSON output for agents
 xhs --format json explore --max_posts 5  # JSON explore results
 xhs --format json search "cats"          # JSON search results
 xhs --format json creator "<url>"        # JSON creator results
+xhs --format json note "<url>"           # JSON note detail + comments
 ```
 
 ## What's Next (PLAN.md Reference)
 
-### Phase 2: Core Features (in progress)
+### Phase 2: Core Features (in progress — 7/10 done)
 
 Implement feature parity with the competitor:
 - ~~`xhs search <query>` — search with filters~~ (done)
 - ~~`xhs explore` — browse homepage feed~~ (done)
 - ~~`xhs creator <url>` — creator profile~~ (done, accepts profile URL)
-- `xhs feed <note_id>` — note detail with comments
-- `xhs like <note_id>` / `xhs favorite <note_id>`
+- ~~`xhs note <url>` — note detail with comments~~ (done, Batch 14)
+- `xhs like <note_id>` / `xhs favorite <note_id>` **(next to build)**
 - `xhs comment <note_id> <text>`
+- `xhs reply <note_id> <comment_id> <text>`
+- `xhs publish` — image+text and video note publishing
 
 All use `src/extract/note.rs` for reading `window.__INITIAL_STATE__` via JS eval.
 
@@ -379,7 +470,7 @@ base64 = "0.22"              # Data URL decoding for login image
 ```bash
 cd xiaohongshu-tools
 cargo build          # Build
-cargo test           # Run tests (extract::note: 7, shared::retry: 3)
+cargo test           # Run tests (extract::note: 10, shared::parse: 11, shared::retry: 3, total: 26)
 cargo fmt            # Format
 cargo run -- --help  # CLI help
 RUST_LOG=debug cargo run -- auth status  # Debug logging

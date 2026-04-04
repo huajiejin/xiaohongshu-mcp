@@ -33,7 +33,7 @@ pub async fn run(
 
     let state = extract_initial_state(&page).await?;
 
-    let creator = parse_user_info(&state, user_id.clone()).unwrap_or(CreatorInfo {
+    let creator = parse_user_info(&state, user_id.clone()).unwrap_or_else(|| CreatorInfo {
         user_id: user_id.clone(),
         nickname: None,
         red_id: None,
