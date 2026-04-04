@@ -156,7 +156,7 @@ impl Note {
                 .publish_time
                 .as_deref()
                 .and_then(|raw| parse_publish_time(raw, collected_at))
-                .map(|dt| dt.format("%Y-%m-%dT%H:%M:%S").to_string()),
+                .map(|dt| dt.to_rfc3339()),
             note_type: card.note_type.clone(),
             title: card.title.clone(),
             note_url: card.note_url(xsec_source),
