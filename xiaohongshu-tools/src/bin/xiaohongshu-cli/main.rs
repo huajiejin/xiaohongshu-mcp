@@ -278,7 +278,8 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    if result.is_err() {
+    if let Err(e) = result {
+        out.error(&e);
         std::process::exit(1);
     } else {
         std::process::exit(0);

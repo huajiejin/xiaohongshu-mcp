@@ -21,6 +21,11 @@ impl std::str::FromStr for Format {
     }
 }
 
+#[derive(Serialize)]
+struct ErrorOutput {
+    error: String,
+}
+
 pub struct Output {
     format: Format,
 }
@@ -37,6 +42,20 @@ impl Output {
                 Ok(json) => println!("{json}"),
                 Err(e) => eprintln!("{}", t!("output.serialize_error", e = e.to_string())),
             },
+        }
+    }
+
+    pub fn error(&self, e: &anyhow::Error) {
+        let msg = format!("{e:#}");
+        match self.format {
+            Format::Text => eprintln!("Error: {msg}"),
+            Format::Json => {
+                let out = ErrorOutput { error: msg };
+                match serde_json::to_string(&out) {
+                    Ok(json) => eprintln!("{json}"),
+                    Err(_) => eprintln!("{{\"error\":\"failed to serialize error\"}}"),
+                }
+            }
         }
     }
 }
