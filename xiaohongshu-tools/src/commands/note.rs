@@ -1,5 +1,6 @@
 use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
+use crate::commands::support::{StagnationAction, StagnationTracker, StopCondition};
 use crate::extract::note::{
     NoteDetail, NoteResult, check_note_page_accessible, extract_note_detail_map,
     extract_video_url_from_dom, parse_link_parts, parse_note_detail_raw,
@@ -7,10 +8,8 @@ use crate::extract::note::{
 use crate::t;
 use anyhow::{Result, anyhow};
 use std::time::{Duration, Instant};
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
-
-const STAGNANT_LIMIT: u32 = 20;
-const LARGE_SCROLL_TRIGGER: u32 = 5;
 
 pub struct NoteOptions {
     pub url: String,
@@ -20,7 +19,11 @@ pub struct NoteOptions {
     pub duration: u64,
 }
 
-pub async fn run(opts: &NoteOptions, browser_opts: &BrowserOptions) -> Result<NoteResult> {
+pub async fn run(
+    opts: &NoteOptions,
+    browser_opts: &BrowserOptions,
+    token: &CancellationToken,
+) -> Result<NoteResult> {
     let start = Instant::now();
 
     let link_parts = parse_link_parts(&opts.url);
@@ -59,7 +62,7 @@ pub async fn run(opts: &NoteOptions, browser_opts: &BrowserOptions) -> Result<No
             opts.max_comments
         );
         let mut human = HumanBehavior::new();
-        load_comments(&page, opts, &mut human, &start).await;
+        load_comments(&page, opts, &mut human, &start, token).await;
 
         if let Ok(new_map) = extract_note_detail_map(&page).await
             && let Some(new_raw) = parse_note_detail_raw(&new_map, &note_id)
@@ -94,6 +97,7 @@ async fn load_comments(
     opts: &NoteOptions,
     human: &mut HumanBehavior,
     start: &Instant,
+    token: &CancellationToken,
 ) {
     scroll_to_comments_area(page).await;
     human.random_delay(human.config.human_delay.clone()).await;
@@ -105,11 +109,16 @@ async fn load_comments(
 
     let max_attempts = (opts.max_comments * 3).max(30);
     let mut prev_count = count_dom_comments(page).await;
-    let mut stagnant = 0u32;
+    let mut stagnation = StagnationTracker::for_comments();
+    let stop = StopCondition::new(opts.max_comments, opts.duration);
 
     for attempt in 0..max_attempts {
-        if start.elapsed().as_secs() >= opts.duration {
-            debug!("reached duration limit ({}s)", opts.duration);
+        if token.is_cancelled() {
+            debug!("cancelled, stopping");
+            break;
+        }
+
+        if stop.check(count_dom_comments(page).await, *start) {
             break;
         }
 
@@ -128,25 +137,28 @@ async fn load_comments(
             break;
         }
 
-        if count == prev_count {
-            stagnant += 1;
-        } else {
-            stagnant = 0;
-        }
+        let made_progress = count != prev_count;
         prev_count = count;
 
-        if stagnant >= STAGNANT_LIMIT {
-            debug!("stagnation detected, big sprint");
-            for _ in 0..10 {
-                let _ = human.scroll_page(page, opts.scroll_speed).await;
+        match stagnation.record(made_progress) {
+            StagnationAction::Sprint => {
+                debug!("stagnation detected, big sprint");
+                for _ in 0..10 {
+                    let _ = human.scroll_page(page, opts.scroll_speed).await;
+                }
+                human.random_delay(human.config.human_delay.clone()).await;
+                stagnation.reset();
+                continue;
             }
-            human.random_delay(human.config.human_delay.clone()).await;
-            stagnant = 0;
-            continue;
+            StagnationAction::Escalate => {
+                scroll_comments(page, human, opts.scroll_speed, true).await;
+                human.random_delay(human.config.human_delay.clone()).await;
+                continue;
+            }
+            _ => {}
         }
 
-        let use_large = stagnant >= LARGE_SCROLL_TRIGGER;
-        scroll_comments(page, human, opts.scroll_speed, use_large).await;
+        scroll_comments(page, human, opts.scroll_speed, false).await;
         human.random_delay(human.config.human_delay.clone()).await;
     }
 }

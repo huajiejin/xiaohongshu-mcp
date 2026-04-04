@@ -242,7 +242,7 @@ impl fmt::Display for CollectionResult {
         )?;
         for (i, note) in self.notes.iter().enumerate() {
             let creator = note.creator_name.as_deref().unwrap_or("-");
-            let creator_id = note.creator_id.as_deref().unwrap_or("-");
+            let note_url = note.note_url.as_deref().unwrap_or("-");
             let profile_url = note.creator_profile_url.as_deref().unwrap_or("-");
             writeln!(
                 f,
@@ -252,7 +252,7 @@ impl fmt::Display for CollectionResult {
                     index = i + 1,
                     title = &note.title,
                     creator = creator,
-                    creator_id = creator_id,
+                    note_url = note_url,
                     profile_url = profile_url,
                 )
             )?;
@@ -296,8 +296,8 @@ impl fmt::Display for CreatorCollectionResult {
             )
         )?;
         for (i, note) in self.notes.iter().enumerate() {
-            let note_type = note.note_type.as_deref().unwrap_or("-");
-            let id = note.id.as_deref().unwrap_or("");
+            let liked_count = note.liked_count.unwrap_or(0);
+            let note_url = note.note_url.as_deref().unwrap_or("");
             writeln!(
                 f,
                 "  {}",
@@ -305,8 +305,8 @@ impl fmt::Display for CreatorCollectionResult {
                     "creator.note_line",
                     index = i + 1,
                     title = &note.title,
-                    note_type = note_type,
-                    id = id,
+                    liked_count = liked_count,
+                    note_url = note_url,
                 )
             )?;
         }

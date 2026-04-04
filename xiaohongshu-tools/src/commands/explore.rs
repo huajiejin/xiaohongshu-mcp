@@ -1,25 +1,20 @@
 use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
+use crate::commands::interact;
+use crate::commands::support::{
+    StagnationAction, StagnationTracker, StopCondition, process_card_batch,
+};
 use crate::extract::note::{
     CollectionResult, ExtractionRoot, Note, NoteCard, extract_note_cards_with_fallback,
 };
 use crate::t;
-use anyhow::{Result, anyhow};
 use chromiumoxide::page::Page;
-use rand::Rng;
 use std::collections::HashSet;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
 const EXPLORE_URL: &str = "https://www.xiaohongshu.com/explore";
-const CLOSE_BTN_SELECTOR: &str = "body > div.note-detail-mask > div.close-circle";
-
-const COMMENT_CONTAINER_SELECTORS: &[&str] = &[
-    "#noteContainer div.interaction-container > div.note-scroller",
-    "#noteContainer div.interaction-container",
-    "#noteContainer",
-];
 
 pub struct ExploreOptions {
     pub keywords: Vec<String>,
@@ -34,7 +29,7 @@ pub async fn run(
     opts: &ExploreOptions,
     browser_opts: &BrowserOptions,
     token: &CancellationToken,
-) -> Result<CollectionResult> {
+) -> Result<CollectionResult, anyhow::Error> {
     let mut browser = browser::create_browser(browser_opts).await?;
     let page = browser::create_page_with_cookies(&browser, EXPLORE_URL).await?;
 
@@ -52,6 +47,8 @@ pub async fn run(
     let mut interacted_keys = HashSet::new();
     let mut cards: Vec<NoteCard> = Vec::new();
     let start = Instant::now();
+    let stop = StopCondition::new(opts.max_notes, opts.duration);
+    let mut stagnation = StagnationTracker::for_feed();
 
     loop {
         if token.is_cancelled() {
@@ -59,7 +56,7 @@ pub async fn run(
             break;
         }
 
-        if should_stop(opts, cards.len(), start) {
+        if stop.check(cards.len(), start) {
             break;
         }
 
@@ -71,44 +68,48 @@ pub async fn run(
             }
         };
 
-        for card in batch {
-            let key = card_unique_key(&card);
-            if seen_keys.contains(&key) {
-                continue;
-            }
-            seen_keys.insert(key.clone());
+        let new_cards = process_card_batch(
+            batch,
+            &mut seen_keys,
+            &opts.keywords,
+            &opts.exclude,
+            &mut cards,
+        );
 
-            let title = card.title.clone();
-
-            if matches_keywords(&title, &opts.exclude) {
-                continue;
-            }
-
-            if !opts.keywords.is_empty() && !matches_keywords(&title, &opts.keywords) {
-                continue;
-            }
-
-            let id = card.id.clone().unwrap_or_default();
-            debug!("[{}] {} | {}", cards.len() + 1, title, id);
-            cards.push(card.clone());
-
-            if opts.interact
-                && !interacted_keys.contains(&key)
-                && let Err(e) = explore_note_by_card(&page, &card, &mut human).await
-            {
+        if opts.interact {
+            for card in &new_cards {
+                let key = crate::commands::support::card_unique_key(card);
+                if interacted_keys.contains(&key) {
+                    continue;
+                }
                 interacted_keys.insert(key);
-                warn!("{}", t!("explore.explore_note_failed", e = e.to_string()));
-            } else if opts.interact {
-                interacted_keys.insert(key);
-            }
 
-            if should_stop(opts, cards.len(), start) {
-                break;
+                if let Err(e) = interact_with_note(&page, card, &mut human).await {
+                    warn!("{}", t!("explore.explore_note_failed", e = e.to_string()));
+                }
             }
         }
 
-        if should_stop(opts, cards.len(), start) {
+        if stop.check(cards.len(), start) {
             break;
+        }
+
+        let made_progress = !new_cards.is_empty();
+        match stagnation.record(made_progress) {
+            StagnationAction::Sprint => {
+                debug!("stagnation detected, sprinting");
+                for _ in 0..5 {
+                    let _ = human.scroll_page(&page, opts.scroll_speed).await;
+                }
+                human.random_delay(human.config.human_delay.clone()).await;
+                stagnation.confirm_sprint();
+                continue;
+            }
+            StagnationAction::GiveUp => {
+                debug!("still no new notes after sprint, stopping");
+                break;
+            }
+            _ => {}
         }
 
         human.scroll_page(&page, opts.scroll_speed).await?;
@@ -133,83 +134,13 @@ pub async fn run(
     })
 }
 
-async fn explore_note_by_card(
+async fn interact_with_note(
     page: &Page,
     card: &NoteCard,
     human: &mut HumanBehavior,
-) -> Result<()> {
-    click_note(page, card).await?;
-
-    human.random_delay(human.config.short_read.clone()).await;
-
-    if let Err(e) = human
-        .scroll_container(page, COMMENT_CONTAINER_SELECTORS)
-        .await
-    {
-        warn!(
-            "{}",
-            t!("explore.scroll_comments_failed", e = e.to_string())
-        );
-    }
-
-    human.random_delay(human.config.human_delay.clone()).await;
-
-    close_detail(page).await;
-
-    let wait = {
-        let mut rng = rand::rng();
-        rng.random_range(1000u64..2000)
-    };
-    tokio::time::sleep(Duration::from_millis(wait)).await;
-
-    Ok(())
-}
-
-async fn click_note(page: &Page, card: &NoteCard) -> Result<()> {
-    if let Some(note_id) = &card.id {
-        let selector = format!("a.cover[href*='/{note_id}']");
-        if let Ok(el) = page.find_element(&selector).await {
-            el.click().await?;
-            return Ok(());
-        }
-    }
-
-    Err(anyhow!(t!(
-        "explore.click_note_failed",
-        e = "note element not found"
-    )))
-}
-
-async fn close_detail(page: &Page) {
-    if let Ok(btn) = page.find_element(CLOSE_BTN_SELECTOR).await
-        && btn.click().await.is_ok()
-    {
-        return;
-    }
-
-    let js = r#"
-        const btn = document.querySelector('.note-detail-mask .close-circle')
-            || document.querySelector('.close-circle');
-        if (btn) { btn.click(); }
-    "#;
-    let _ = page.evaluate_expression(js).await;
-
-    let esc_js = r#"
-        document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape',keyCode:27,bubbles:true}));
-    "#;
-    let _ = page.evaluate_expression(esc_js).await;
-}
-
-fn should_stop(opts: &ExploreOptions, matched: usize, start: Instant) -> bool {
-    if matched >= opts.max_notes {
-        debug!("reached max notes limit ({})", opts.max_notes);
-        return true;
-    }
-    if start.elapsed().as_secs() >= opts.duration {
-        debug!("reached duration limit ({}s)", opts.duration);
-        return true;
-    }
-    false
+) -> Result<(), anyhow::Error> {
+    interact::open_note(page, card).await?;
+    interact::browse_note(page, human).await
 }
 
 async fn check_login(page: &Page) {
@@ -220,19 +151,4 @@ async fn check_login(page: &Page) {
     if !logged_in {
         warn!("{}", t!("explore.not_logged_in_warn"));
     }
-}
-
-fn card_unique_key(card: &NoteCard) -> String {
-    if let Some(id) = &card.id {
-        return format!("id:{id}");
-    }
-    format!("title:{}", card.title)
-}
-
-fn matches_keywords(text: &str, keywords: &[String]) -> bool {
-    if keywords.is_empty() {
-        return false;
-    }
-    let lower = text.to_lowercase();
-    keywords.iter().any(|kw| lower.contains(&kw.to_lowercase()))
 }

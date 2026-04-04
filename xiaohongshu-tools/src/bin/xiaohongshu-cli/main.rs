@@ -81,6 +81,9 @@ enum Commands {
         #[arg(long, default_value = "normal")]
         scroll_speed: String,
 
+        #[arg(long)]
+        interact: bool,
+
         #[arg(long, default_value_t = 10)]
         duration: u64,
     },
@@ -93,6 +96,9 @@ enum Commands {
 
         #[arg(long, default_value = "normal")]
         scroll_speed: String,
+
+        #[arg(long)]
+        interact: bool,
 
         #[arg(long, default_value_t = 10)]
         duration: u64,
@@ -159,6 +165,7 @@ fn build_command() -> clap::Command {
             .mut_arg("location", |a| a.help(i18n::cli_location_help()))
             .mut_arg("max_notes", |a| a.help(i18n::cli_max_notes_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
+            .mut_arg("interact", |a| a.help(i18n::cli_interact_help()))
             .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
     })
     .mut_subcommand("creator", |s| {
@@ -166,6 +173,7 @@ fn build_command() -> clap::Command {
             .mut_arg("url", |a| a.help(i18n::cli_url_help()))
             .mut_arg("max_notes", |a| a.help(i18n::cli_max_notes_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
+            .mut_arg("interact", |a| a.help(i18n::cli_interact_help()))
             .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
     })
     .mut_subcommand("note", |s| {
@@ -307,6 +315,7 @@ async fn run_command(
             location,
             max_notes,
             scroll_speed,
+            interact,
             duration,
         } => {
             let speed: ScrollSpeed = scroll_speed.parse()?;
@@ -320,6 +329,7 @@ async fn run_command(
                     location: location.map(|s| s.parse()).transpose()?,
                     max_notes,
                     scroll_speed: speed,
+                    interact,
                     duration,
                 },
                 opts,
@@ -332,6 +342,7 @@ async fn run_command(
             url,
             max_notes,
             scroll_speed,
+            interact,
             duration,
         } => {
             let speed: ScrollSpeed = scroll_speed.parse()?;
@@ -340,6 +351,7 @@ async fn run_command(
                     url,
                     max_notes,
                     scroll_speed: speed,
+                    interact,
                     duration,
                 },
                 opts,
@@ -365,6 +377,7 @@ async fn run_command(
                     duration,
                 },
                 opts,
+                &token,
             )
             .await?;
             out.result(&result);

@@ -42,7 +42,7 @@ auth:
 
 collection:
   matched_notes: "Matched %{count} notes in %{time}s (collected at %{collected_at})"
-  note_line: "%{index}. %{title} | creator: %{creator} | creator_id: %{creator_id} | profile: %{profile_url}"
+  note_line: "%{index}. %{title} | creator: %{creator} | note_url: %{note_url} | profile: %{profile_url}"
 
 explore:
   not_logged_in_warn: "not logged in, content may be limited. Run 'xhs auth login' first."
@@ -93,7 +93,7 @@ search:
 
 creator:
   matched_notes: "Creator %{user_id}: collected %{count} notes in %{time}s (collected at %{collected_at})"
-  note_line: "%{index}. %{title} | %{note_type} | %{id}"
+  note_line: "%{index}. %{title} | liked_count: %{liked_count} | note_url: %{note_url}"
   wait_initial_state_timeout: "timed out waiting for creator page to load"
   invalid_url: "invalid creator URL — expected format: https://www.xiaohongshu.com/user/profile/<user_id>?xsec_token=..."
 
