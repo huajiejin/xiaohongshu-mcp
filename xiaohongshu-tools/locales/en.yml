@@ -30,6 +30,10 @@ cli:
   note_url_help: "Note URL — copy from explore/search output"
   max_comments_help: "Max top-level comments to load"
   max_replies_help: "Max sub-replies to expand per comment"
+  like_about: "Like a note"
+  favorite_about: "Favorite a note"
+  like_url_help: "Note URL — copy from explore/search output"
+  undo_help: "Undo the action (unlike / unfavorite)"
 
 auth:
   logged_in: "Logged in"
@@ -111,3 +115,8 @@ note:
   invalid_url: "Invalid note URL — expected format: https://www.xiaohongshu.com/explore/<note_id>?xsec_token=..."
   page_blocked: "Note is not accessible: %{reason}"
   wait_timeout: "Timed out waiting for note page to load"
+
+like:
+  done: "%{action} succeeded for note %{note_id}"
+  skipped: "%{action} skipped for note %{note_id} — already in target state"
+  button_not_found: "Interaction button not found: %{error}"

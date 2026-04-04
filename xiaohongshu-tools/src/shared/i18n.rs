@@ -107,3 +107,15 @@ pub fn cli_max_comments_help() -> String {
 pub fn cli_max_replies_help() -> String {
     t!("cli.max_replies_help").to_string()
 }
+pub fn cli_like_about() -> String {
+    t!("cli.like_about").to_string()
+}
+pub fn cli_favorite_about() -> String {
+    t!("cli.favorite_about").to_string()
+}
+pub fn cli_like_url_help() -> String {
+    t!("cli.like_url_help").to_string()
+}
+pub fn cli_undo_help() -> String {
+    t!("cli.undo_help").to_string()
+}

@@ -30,6 +30,10 @@ cli:
   note_url_help: "笔记 URL — 从 explore/search 输出中复制"
   max_comments_help: "最多加载的评论数"
   max_replies_help: "每条评论最多展开的子回复数"
+  like_about: "点赞笔记"
+  favorite_about: "收藏笔记"
+  like_url_help: "笔记 URL — 从 explore/search 输出中复制"
+  undo_help: "撤销操作（取消点赞 / 取消收藏）"
 
 auth:
   logged_in: "已登录"
@@ -111,3 +115,8 @@ note:
   invalid_url: "无效的笔记 URL — 格式: https://www.xiaohongshu.com/explore/<note_id>?xsec_token=..."
   page_blocked: "笔记无法访问: %{reason}"
   wait_timeout: "等待笔记页面加载超时"
+
+like:
+  done: "笔记 %{note_id} %{action}成功"
+  skipped: "笔记 %{note_id} %{action}跳过 — 已处于目标状态"
+  button_not_found: "未找到交互按钮: %{error}"

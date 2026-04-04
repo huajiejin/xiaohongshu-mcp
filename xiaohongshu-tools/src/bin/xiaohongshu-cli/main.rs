@@ -7,7 +7,7 @@ use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 use xiaohongshu_tools::browser::human::ScrollSpeed;
 use xiaohongshu_tools::browser::{create_browser, create_page_with_cookies};
-use xiaohongshu_tools::commands::{creator, explore, note, search};
+use xiaohongshu_tools::commands::{creator, explore, like, note, search};
 use xiaohongshu_tools::shared::i18n;
 use xiaohongshu_tools::shared::output::{Format, Output};
 
@@ -120,6 +120,20 @@ enum Commands {
         duration: u64,
     },
 
+    Like {
+        url: String,
+
+        #[arg(long)]
+        undo: bool,
+    },
+
+    Favorite {
+        url: String,
+
+        #[arg(long)]
+        undo: bool,
+    },
+
     Open {
         url: String,
     },
@@ -183,6 +197,16 @@ fn build_command() -> clap::Command {
             .mut_arg("max_replies", |a| a.help(i18n::cli_max_replies_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
             .mut_arg("duration", |a| a.help(i18n::cli_duration_help()))
+    })
+    .mut_subcommand("like", |s| {
+        s.about(i18n::cli_like_about())
+            .mut_arg("url", |a| a.help(i18n::cli_like_url_help()))
+            .mut_arg("undo", |a| a.help(i18n::cli_undo_help()))
+    })
+    .mut_subcommand("favorite", |s| {
+        s.about(i18n::cli_favorite_about())
+            .mut_arg("url", |a| a.help(i18n::cli_like_url_help()))
+            .mut_arg("undo", |a| a.help(i18n::cli_undo_help()))
     })
     .mut_subcommand("open", |s| {
         s.about(i18n::cli_open_about())
@@ -378,6 +402,24 @@ async fn run_command(
                 },
                 opts,
                 &token,
+            )
+            .await?;
+            out.result(&result);
+        }
+        Commands::Like { url, undo } => {
+            let result = like::run(
+                &like::LikeOptions { url, undo },
+                opts,
+                like::InteractionKind::Like,
+            )
+            .await?;
+            out.result(&result);
+        }
+        Commands::Favorite { url, undo } => {
+            let result = like::run(
+                &like::LikeOptions { url, undo },
+                opts,
+                like::InteractionKind::Favorite,
             )
             .await?;
             out.result(&result);
