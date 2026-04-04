@@ -10,6 +10,7 @@ use chromiumoxide::page::Page;
 use std::collections::HashSet;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
 const SEARCH_URL_TEMPLATE: &str =
@@ -222,10 +223,14 @@ pub struct SearchOptions {
     pub duration: Option<u64>,
 }
 
-pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<CollectionResult> {
+pub async fn run(
+    opts: &SearchOptions,
+    browser_opts: &BrowserOptions,
+    token: &CancellationToken,
+) -> Result<CollectionResult> {
     let url = SEARCH_URL_TEMPLATE.replace("{keyword}", &urlencoding::encode(&opts.query));
 
-    let browser = browser::create_browser(browser_opts).await?;
+    let mut browser = browser::create_browser(browser_opts).await?;
     let page = browser::create_page_with_cookies(&browser, &url).await?;
 
     wait_initial_state(&page).await?;
@@ -246,6 +251,11 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
     let start = Instant::now();
 
     loop {
+        if token.is_cancelled() {
+            debug!("cancelled, stopping");
+            break;
+        }
+
         if should_stop(opts, cards.len(), start) {
             break;
         }
@@ -291,6 +301,7 @@ pub async fn run(opts: &SearchOptions, browser_opts: &BrowserOptions) -> Result<
     let total = notes.len();
     debug!("done: searched {} notes in {}s", total, duration_secs);
 
+    browser.close().await?;
     Ok(CollectionResult {
         total,
         notes,

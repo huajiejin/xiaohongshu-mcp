@@ -8,6 +8,8 @@ use chromiumoxide::cdp::browser_protocol::network::{
 use chromiumoxide::page::Page;
 use futures::StreamExt;
 use rand::Rng;
+use std::ops::Deref;
+use std::path::PathBuf;
 use std::time::Duration;
 use tracing::debug;
 
@@ -38,7 +40,48 @@ fn mask_proxy_credentials(url: &str) -> String {
     format!("{proto}***:***@{rest}")
 }
 
-pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
+pub struct BrowserHandle {
+    browser: Browser,
+    user_data_dir: PathBuf,
+}
+
+impl Deref for BrowserHandle {
+    type Target = Browser;
+    fn deref(&self) -> &Self::Target {
+        &self.browser
+    }
+}
+
+impl BrowserHandle {
+    pub async fn close(&mut self) -> Result<()> {
+        self.browser.close().await?;
+        self.cleanup_dir();
+        Ok(())
+    }
+
+    fn cleanup_dir(&self) {
+        if self.user_data_dir.exists()
+            && let Err(e) = std::fs::remove_dir_all(&self.user_data_dir)
+        {
+            debug!("failed to remove user-data-dir: {e}");
+        }
+    }
+}
+
+impl Drop for BrowserHandle {
+    fn drop(&mut self) {
+        if let Some(child) = self.browser.get_mut_child()
+            && let Some(id) = child.as_mut_inner().id()
+        {
+            let _ = std::process::Command::new("kill")
+                .args(["-9", &id.to_string()])
+                .output();
+        }
+        self.cleanup_dir();
+    }
+}
+
+pub async fn create_browser(opts: &BrowserOptions) -> Result<BrowserHandle> {
     let proxy: Option<String> = opts
         .proxy
         .clone()
@@ -58,7 +101,42 @@ pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
     };
     debug!("Viewport: {}x{}", w, h);
 
+    let max_attempts = 3;
+    for attempt in 0..max_attempts {
+        let (cfg, user_data_dir) = build_config(w, h, &proxy, opts.headless)?;
+        match Browser::launch(cfg).await {
+            Ok((browser, mut handler)) => {
+                tokio::spawn(async move { while handler.next().await.is_some() {} });
+                return Ok(BrowserHandle {
+                    browser,
+                    user_data_dir,
+                });
+            }
+            Err(e) if attempt + 1 < max_attempts => {
+                debug!(attempt, error = %e, "browser launch failed, retrying");
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+
+    unreachable!()
+}
+
+fn build_config(
+    w: u32,
+    h: u32,
+    proxy: &Option<String>,
+    headless: bool,
+) -> Result<(chromiumoxide::browser::BrowserConfig, PathBuf)> {
+    let port = {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0))?;
+        listener.local_addr()?.port()
+    };
+    let user_data_dir = std::env::temp_dir().join(format!("xhs-browser-{}", port));
+    debug!("Browser port: {}, user-data-dir: {:?}", port, user_data_dir);
+
     let mut config = BrowserConfig::builder()
+        .port(port)
         .request_timeout(Duration::from_secs(60))
         .hide()
         .disable_default_args()
@@ -80,25 +158,21 @@ pub async fn create_browser(opts: &BrowserOptions) -> Result<Browser> {
         .arg("disable-blink-features=AutomationControlled")
         .arg(("force-color-profile", &["srgb"][..]))
         .arg(("lang", &["zh-CN"][..]))
-        .arg(format!("window-size={},{}", w, h));
+        .arg(format!("window-size={},{}", w, h))
+        .arg(format!("user-data-dir={}", user_data_dir.display()));
 
     if let Some(proxy_url) = proxy {
-        let url_owned = proxy_url;
-        config = config.arg(format!("proxy-server={}", url_owned));
+        config = config.arg(format!("proxy-server={}", proxy_url));
     }
 
-    if !opts.headless {
+    if !headless {
         config = config.with_head();
     }
 
-    let cfg = config
+    config
         .build()
-        .map_err(|e| anyhow!("{}", t!("browser.config_error", e = e)))?;
-    let (browser, mut handler) = Browser::launch(cfg).await?;
-
-    tokio::spawn(async move { while handler.next().await.is_some() {} });
-
-    Ok(browser)
+        .map_err(|e| anyhow!("{}", t!("browser.config_error", e = e)))
+        .map(|c| (c, user_data_dir))
 }
 
 pub async fn create_page_with_cookies(browser: &Browser, url: &str) -> Result<Page> {

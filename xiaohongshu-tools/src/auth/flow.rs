@@ -7,6 +7,7 @@ use chromiumoxide::page::Page;
 use serde::Serialize;
 use std::fmt;
 use std::time::Duration;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
 const XHS_URL: &str = "https://www.xiaohongshu.com";
@@ -49,16 +50,17 @@ impl fmt::Display for LogoutResult {
     }
 }
 
-pub async fn login(opts: &BrowserOptions) -> Result<LoginResult> {
+pub async fn login(opts: &BrowserOptions, token: &CancellationToken) -> Result<LoginResult> {
     debug!("Opening browser for login...");
 
-    let browser = browser::create_browser(opts).await?;
+    let mut browser = browser::create_browser(opts).await?;
     let page = browser::create_page_with_cookies(&browser, XHS_URL).await?;
 
     if is_logged_in(&page).await? {
         debug!("Already logged in!");
         let cookies = browser::extract_cookies(&page).await?;
         cookies::save_cookies(&cookies)?;
+        browser.close().await?;
         return Ok(LoginResult { logged_in: true });
     }
 
@@ -70,7 +72,13 @@ pub async fn login(opts: &BrowserOptions) -> Result<LoginResult> {
     }
 
     loop {
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        tokio::select! {
+            _ = token.cancelled() => {
+                debug!("cancelled during login wait");
+                anyhow::bail!("interrupted");
+            }
+            _ = tokio::time::sleep(Duration::from_secs(2)) => {}
+        }
 
         match is_logged_in(&page).await {
             Ok(true) => {
@@ -88,6 +96,7 @@ pub async fn login(opts: &BrowserOptions) -> Result<LoginResult> {
         }
     }
 
+    browser.close().await?;
     Ok(LoginResult { logged_in: true })
 }
 
@@ -98,13 +107,14 @@ pub async fn logout(opts: &BrowserOptions) -> Result<LogoutResult> {
         headless: true,
         proxy: opts.proxy.clone(),
     };
-    let browser = browser::create_browser(&headless_opts).await?;
+    let mut browser = browser::create_browser(&headless_opts).await?;
     let page = browser.new_page("about:blank").await?;
     page.enable_stealth_mode().await?;
     page.goto(XHS_URL).await?;
     browser::clear_browser_cookies(&page).await?;
 
     debug!("Logout complete");
+    browser.close().await?;
     Ok(LogoutResult { logged_out: true })
 }
 
@@ -113,10 +123,11 @@ pub async fn check_status(opts: &BrowserOptions) -> Result<StatusResult> {
         return Ok(StatusResult { logged_in: false });
     }
 
-    let browser = browser::create_browser(opts).await?;
+    let mut browser = browser::create_browser(opts).await?;
     let page = browser::create_page_with_cookies(&browser, XHS_URL).await?;
 
     let logged_in = is_logged_in(&page).await?;
+    browser.close().await?;
     Ok(StatusResult { logged_in })
 }
 

@@ -1,4 +1,8 @@
+use std::time::Duration;
+
 use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
+use tokio::io::AsyncReadExt;
+use tokio_util::sync::CancellationToken;
 use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 use xiaohongshu_tools::browser::human::ScrollSpeed;
@@ -171,7 +175,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,chromiumoxide=error")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,chromiumoxide=off")),
         )
         .with_target(false)
         .init();
@@ -192,18 +196,57 @@ async fn main() -> anyhow::Result<()> {
         proxy: cli.proxy,
     };
 
-    match cli.command {
+    let token = CancellationToken::new();
+    let token_clone = token.clone();
+
+    // ctrl+d
+    let stdin_eof = async {
+        let mut buf = [0u8; 1];
+        let _ = tokio::io::stdin().read(&mut buf).await;
+    };
+
+    let interrupt = async {
+        tokio::select! {
+            _ = stdin_eof => {},
+            _ = tokio::signal::ctrl_c() => {},
+        }
+    };
+
+    let result = tokio::select! {
+        res = async { run_command(cli.command, &opts, &out, token_clone).await } => res,
+        _ = interrupt => {
+            token.cancel();
+            eprintln!("\nInterrupted, shutting down...");
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            Err(anyhow::anyhow!("interrupted"))
+        }
+    };
+
+    if result.is_err() {
+        std::process::exit(1);
+    } else {
+        std::process::exit(0);
+    }
+}
+
+async fn run_command(
+    command: Commands,
+    opts: &BrowserOptions,
+    out: &Output,
+    token: CancellationToken,
+) -> anyhow::Result<()> {
+    match command {
         Commands::Auth { command } => match command {
             AuthCommands::Login => {
-                let result = auth::login(&opts).await?;
+                let result = auth::login(opts, &token).await?;
                 out.result(&result);
             }
             AuthCommands::Logout => {
-                let result = auth::logout(&opts).await?;
+                let result = auth::logout(opts).await?;
                 out.result(&result);
             }
             AuthCommands::Status => {
-                let result = auth::check_status(&opts).await?;
+                let result = auth::check_status(opts).await?;
                 out.result(&result);
             }
         },
@@ -225,7 +268,8 @@ async fn main() -> anyhow::Result<()> {
                     interact,
                     duration,
                 },
-                &opts,
+                opts,
+                &token,
             )
             .await?;
             out.result(&result);
@@ -254,7 +298,8 @@ async fn main() -> anyhow::Result<()> {
                     scroll_speed: speed,
                     duration,
                 },
-                &opts,
+                opts,
+                &token,
             )
             .await?;
             out.result(&result);
@@ -273,35 +318,30 @@ async fn main() -> anyhow::Result<()> {
                     scroll_speed: speed,
                     duration,
                 },
-                &opts,
+                opts,
+                &token,
             )
             .await?;
             out.result(&result);
         }
         Commands::Open { url } => {
-            let mut browser = create_browser(&opts).await?;
+            let mut browser = create_browser(opts).await?;
             let page = create_page_with_cookies(&browser, &url).await?;
             println!("{}", i18n::cli_open_about());
-
-            use tokio::io::AsyncReadExt;
-
-            let stdin_eof = async {
-                let mut buf = [0u8; 1];
-                let _ = tokio::io::stdin().read(&mut buf).await;
-            };
 
             let browser_closed = xiaohongshu_tools::shared::utils::wait_for_page_close(
                 &page,
                 std::time::Duration::from_secs(2),
             );
 
+            let cancelled = token.cancelled();
+
             tokio::select! {
-                _ = stdin_eof => {}
                 _ = browser_closed => {}
+                _ = cancelled => {}
             }
 
             browser.close().await?;
-            std::process::exit(0);
         }
     }
 

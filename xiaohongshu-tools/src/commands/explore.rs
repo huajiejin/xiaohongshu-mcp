@@ -9,6 +9,7 @@ use chromiumoxide::page::Page;
 use rand::Rng;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
 const EXPLORE_URL: &str = "https://www.xiaohongshu.com/explore";
@@ -29,8 +30,12 @@ pub struct ExploreOptions {
     pub duration: Option<u64>,
 }
 
-pub async fn run(opts: &ExploreOptions, browser_opts: &BrowserOptions) -> Result<CollectionResult> {
-    let browser = browser::create_browser(browser_opts).await?;
+pub async fn run(
+    opts: &ExploreOptions,
+    browser_opts: &BrowserOptions,
+    token: &CancellationToken,
+) -> Result<CollectionResult> {
+    let mut browser = browser::create_browser(browser_opts).await?;
     let page = browser::create_page_with_cookies(&browser, EXPLORE_URL).await?;
 
     check_login(&page).await;
@@ -49,6 +54,11 @@ pub async fn run(opts: &ExploreOptions, browser_opts: &BrowserOptions) -> Result
     let start = Instant::now();
 
     loop {
+        if token.is_cancelled() {
+            debug!("cancelled, stopping");
+            break;
+        }
+
         if should_stop(opts, cards.len(), start) {
             break;
         }
@@ -114,6 +124,7 @@ pub async fn run(opts: &ExploreOptions, browser_opts: &BrowserOptions) -> Result
     let total = notes.len();
     debug!("done: explored {} notes in {}s", total, duration_secs);
 
+    browser.close().await?;
     Ok(CollectionResult {
         total,
         notes,

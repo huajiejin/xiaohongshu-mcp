@@ -8,6 +8,7 @@ use crate::t;
 use anyhow::{Result, anyhow};
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 
 pub struct CreatorOptions {
@@ -20,11 +21,12 @@ pub struct CreatorOptions {
 pub async fn run(
     opts: &CreatorOptions,
     browser_opts: &BrowserOptions,
+    token: &CancellationToken,
 ) -> Result<CreatorCollectionResult> {
     let (user_id, _) =
         parse_creator_link(&opts.url).ok_or_else(|| anyhow!("{}", t!("creator.invalid_url")))?;
 
-    let browser = browser::create_browser(browser_opts).await?;
+    let mut browser = browser::create_browser(browser_opts).await?;
     let page = browser::create_page_with_cookies(&browser, &opts.url).await?;
 
     wait_initial_state(&page).await?;
@@ -47,7 +49,16 @@ pub async fn run(
     let mut cards: Vec<NoteCard> = Vec::new();
     let start = Instant::now();
 
-    collect_notes(&page, &mut cards, &mut seen_keys, opts, &mut human, &start).await;
+    collect_notes(
+        &page,
+        &mut cards,
+        &mut seen_keys,
+        opts,
+        &mut human,
+        &start,
+        token,
+    )
+    .await;
 
     let duration_secs = start.elapsed().as_secs();
     let collected_at = chrono::Local::now();
@@ -61,6 +72,7 @@ pub async fn run(
         total, duration_secs
     );
 
+    browser.close().await?;
     Ok(CreatorCollectionResult {
         creator,
         total,
@@ -77,8 +89,14 @@ async fn collect_notes(
     opts: &CreatorOptions,
     human: &mut HumanBehavior,
     start: &Instant,
+    token: &CancellationToken,
 ) {
     loop {
+        if token.is_cancelled() {
+            debug!("cancelled, stopping");
+            break;
+        }
+
         if should_stop(opts, cards.len(), *start) {
             break;
         }
