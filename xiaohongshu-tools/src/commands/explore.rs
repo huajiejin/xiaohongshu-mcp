@@ -120,6 +120,7 @@ pub async fn run(
     let collected_at = chrono::Local::now();
     let notes: Vec<Note> = cards
         .iter()
+        .take(opts.max_notes)
         .map(|c| Note::from_card(c, None, collected_at))
         .collect();
     let total = notes.len();

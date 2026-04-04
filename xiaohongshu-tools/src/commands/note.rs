@@ -74,6 +74,11 @@ pub async fn run(
     }
 
     let mut detail = NoteDetail::from_raw(&raw);
+    detail.comments.truncate(opts.max_comments);
+    for comment in &mut detail.comments {
+        comment.sub_comments.truncate(opts.max_replies);
+    }
+    detail.comments_loaded = detail.comments.len();
     detail.video_url = video_url;
     detail.note_url = Some(opts.url.clone());
 
