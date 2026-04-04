@@ -24,7 +24,7 @@ cli:
   location_help: "Location: all, same_city, nearby"
   creator_about: "Explore a creator's notes. Pass the profile URL from 'xhs explore' or 'xhs search' output."
   url_help: "Creator profile URL — copy from explore/search profile field"
-  open_about: "Open a URL in the browser with loaded cookies. Press Ctrl+C or Ctrl+D to close."
+  open_about: "Open a URL in the browser with loaded cookies. Press Ctrl+C to close."
   open_url_help: "URL to open"
 
 auth:
