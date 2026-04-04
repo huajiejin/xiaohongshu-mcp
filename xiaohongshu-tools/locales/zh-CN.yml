@@ -43,6 +43,8 @@ cli:
 auth:
   logged_in: "已登录"
   not_logged_in: "未登录"
+  status_logged_in: "配置 '%{profile}'：已登录为 %{nickname}（小红书号: %{red_id}）"
+  status_not_logged_in: "配置 '%{profile}'：未登录"
   logged_out: "已登出"
   scan_qr_browser: "请在浏览器窗口中扫描二维码..."
   scan_qr_image: "\n请扫描上方二维码登录。\n"

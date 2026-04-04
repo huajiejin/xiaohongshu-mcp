@@ -13,6 +13,68 @@ use tracing::{debug, info, warn};
 const XHS_URL: &str = "https://www.xiaohongshu.com";
 const LOGIN_SELECTOR: &str = ".main-container .user .link-wrapper .channel";
 
+const JS_EXTRACT_USER_INFO: &str = r#"(() => {
+    const s = window.__INITIAL_STATE__;
+    if (!s) return null;
+    const get_val = (o) => o?.value || o?._value || o?._rawValue;
+    const info = get_val(s?.user?.userInfo) || s?.user?.userInfo;
+    if (!info || typeof info !== 'object') return null;
+    return JSON.parse(JSON.stringify(info));
+})()"#;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserInfo {
+    pub user_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nickname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub red_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub desc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gender: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
+}
+
+fn parse_user_info(val: &serde_json::Value) -> Option<UserInfo> {
+    let user_id = val
+        .get("userId")
+        .or_else(|| val.get("user_id"))
+        .and_then(|v| v.as_str())
+        .map(ToString::to_string)?;
+
+    let gender_num = val.get("gender").and_then(|v| v.as_i64());
+    let gender = gender_num.map(|g| match g {
+        1 => "male".to_string(),
+        2 => "female".to_string(),
+        _ => "unknown".to_string(),
+    });
+
+    Some(UserInfo {
+        user_id,
+        nickname: val
+            .get("nickname")
+            .and_then(|v| v.as_str())
+            .map(ToString::to_string),
+        red_id: val
+            .get("redId")
+            .or_else(|| val.get("red_id"))
+            .and_then(|v| v.as_str())
+            .map(ToString::to_string),
+        desc: val
+            .get("desc")
+            .and_then(|v| v.as_str())
+            .map(ToString::to_string),
+        gender,
+        avatar: val
+            .get("imageb")
+            .and_then(|v| v.as_str())
+            .or_else(|| val.get("images").and_then(|v| v.as_str()))
+            .map(ToString::to_string),
+    })
+}
+
 #[derive(Serialize)]
 pub struct LoginResult {
     pub logged_in: bool,
@@ -26,15 +88,35 @@ impl fmt::Display for LoginResult {
 
 #[derive(Serialize)]
 pub struct StatusResult {
+    pub profile: String,
     pub logged_in: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<UserInfo>,
 }
 
 impl fmt::Display for StatusResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.logged_in {
-            write!(f, "{}", t!("auth.logged_in"))
+            if let Some(ref u) = self.user {
+                write!(
+                    f,
+                    "{}",
+                    t!(
+                        "auth.status_logged_in",
+                        profile = &self.profile,
+                        nickname = u.nickname.as_deref().unwrap_or("-"),
+                        red_id = u.red_id.as_deref().unwrap_or("-")
+                    )
+                )
+            } else {
+                write!(f, "{}", t!("auth.logged_in"))
+            }
         } else {
-            write!(f, "{}", t!("auth.not_logged_in"))
+            write!(
+                f,
+                "{}",
+                t!("auth.status_not_logged_in", profile = &self.profile)
+            )
         }
     }
 }
@@ -121,18 +203,42 @@ pub async fn logout(opts: &BrowserOptions) -> Result<LogoutResult> {
 
 pub async fn check_status(opts: &BrowserOptions) -> Result<StatusResult> {
     if !cookies::cookies_exist(&opts.profile) {
-        return Ok(StatusResult { logged_in: false });
+        return Ok(StatusResult {
+            profile: opts.profile.clone(),
+            logged_in: false,
+            user: None,
+        });
     }
 
     let mut browser = browser::create_browser(opts).await?;
     let page = browser::create_page_with_cookies(&browser, XHS_URL, &opts.profile).await?;
 
     let logged_in = is_logged_in(&page).await?;
+
+    let user = if logged_in {
+        extract_logged_in_user(&page).await
+    } else {
+        None
+    };
+
     browser.close().await?;
-    Ok(StatusResult { logged_in })
+    Ok(StatusResult {
+        profile: opts.profile.clone(),
+        logged_in,
+        user,
+    })
 }
 
 async fn is_logged_in(page: &Page) -> Result<bool> {
     let element = page.find_element(LOGIN_SELECTOR).await;
     Ok(element.is_ok())
+}
+
+async fn extract_logged_in_user(page: &Page) -> Option<UserInfo> {
+    let result = page.evaluate(JS_EXTRACT_USER_INFO).await.ok()?;
+    let val: serde_json::Value = result.into_value().ok()?;
+    if val.is_null() {
+        return None;
+    }
+    parse_user_info(&val)
 }

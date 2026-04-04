@@ -43,6 +43,8 @@ cli:
 auth:
   logged_in: "Logged in"
   not_logged_in: "Not logged in"
+  status_logged_in: "Profile '%{profile}': logged in as %{nickname} (red_id: %{red_id})"
+  status_not_logged_in: "Profile '%{profile}': not logged in"
   logged_out: "Logged out"
   scan_qr_browser: "Please scan the QR code in the browser window..."
   scan_qr_image: "\nPlease scan the QR code above to login.\n"
