@@ -24,10 +24,10 @@ const COMMENT_CONTAINER_SELECTORS: &[&str] = &[
 pub struct ExploreOptions {
     pub keywords: Vec<String>,
     pub exclude: Vec<String>,
-    pub max_notes: Option<usize>,
+    pub max_notes: usize,
     pub scroll_speed: ScrollSpeed,
     pub interact: bool,
-    pub duration: Option<u64>,
+    pub duration: u64,
 }
 
 pub async fn run(
@@ -201,16 +201,12 @@ async fn close_detail(page: &Page) {
 }
 
 fn should_stop(opts: &ExploreOptions, matched: usize, start: Instant) -> bool {
-    if let Some(max) = opts.max_notes
-        && matched >= max
-    {
-        debug!("reached max notes limit ({max})");
+    if matched >= opts.max_notes {
+        debug!("reached max notes limit ({})", opts.max_notes);
         return true;
     }
-    if let Some(dur) = opts.duration
-        && start.elapsed().as_secs() >= dur
-    {
-        debug!("reached duration limit ({dur}s)");
+    if start.elapsed().as_secs() >= opts.duration {
+        debug!("reached duration limit ({}s)", opts.duration);
         return true;
     }
     false

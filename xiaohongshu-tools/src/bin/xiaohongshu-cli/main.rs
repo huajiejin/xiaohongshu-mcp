@@ -44,8 +44,8 @@ enum Commands {
         #[arg(long, value_delimiter = ',')]
         exclude: Vec<String>,
 
-        #[arg(long)]
-        max_notes: Option<usize>,
+        #[arg(long, default_value_t = 10)]
+        max_notes: usize,
 
         #[arg(long, default_value = "normal")]
         scroll_speed: String,
@@ -53,8 +53,8 @@ enum Commands {
         #[arg(long)]
         interact: bool,
 
-        #[arg(long)]
-        duration: Option<u64>,
+        #[arg(long, default_value_t = 10)]
+        duration: u64,
     },
 
     Search {
@@ -75,27 +75,27 @@ enum Commands {
         #[arg(long)]
         location: Option<String>,
 
-        #[arg(long)]
-        max_notes: Option<usize>,
+        #[arg(long, default_value_t = 10)]
+        max_notes: usize,
 
         #[arg(long, default_value = "normal")]
         scroll_speed: String,
 
-        #[arg(long)]
-        duration: Option<u64>,
+        #[arg(long, default_value_t = 10)]
+        duration: u64,
     },
 
     Creator {
         url: String,
 
-        #[arg(long)]
-        max_notes: Option<usize>,
+        #[arg(long, default_value_t = 10)]
+        max_notes: usize,
 
         #[arg(long, default_value = "normal")]
         scroll_speed: String,
 
-        #[arg(long)]
-        duration: Option<u64>,
+        #[arg(long, default_value_t = 10)]
+        duration: u64,
     },
 
     Note {

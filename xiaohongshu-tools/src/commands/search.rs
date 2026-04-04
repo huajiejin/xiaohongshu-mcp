@@ -218,9 +218,9 @@ pub struct SearchOptions {
     pub publish_time: Option<PublishTime>,
     pub search_scope: Option<SearchScope>,
     pub location: Option<Location>,
-    pub max_notes: Option<usize>,
+    pub max_notes: usize,
     pub scroll_speed: ScrollSpeed,
-    pub duration: Option<u64>,
+    pub duration: u64,
 }
 
 pub async fn run(
@@ -454,16 +454,12 @@ async fn wait_for_filter_panel(page: &Page) -> bool {
 }
 
 fn should_stop(opts: &SearchOptions, matched: usize, start: Instant) -> bool {
-    if let Some(max) = opts.max_notes
-        && matched >= max
-    {
-        debug!("reached max notes limit ({max})");
+    if matched >= opts.max_notes {
+        debug!("reached max notes limit ({})", opts.max_notes);
         return true;
     }
-    if let Some(dur) = opts.duration
-        && start.elapsed().as_secs() >= dur
-    {
-        debug!("reached duration limit ({dur}s)");
+    if start.elapsed().as_secs() >= opts.duration {
+        debug!("reached duration limit ({}s)", opts.duration);
         return true;
     }
     false
