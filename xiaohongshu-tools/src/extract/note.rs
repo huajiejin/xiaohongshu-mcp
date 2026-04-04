@@ -243,7 +243,7 @@ impl fmt::Display for CollectionResult {
         for (i, note) in self.notes.iter().enumerate() {
             let creator = note.creator_name.as_deref().unwrap_or("-");
             let note_url = note.note_url.as_deref().unwrap_or("-");
-            let profile_url = note.creator_profile_url.as_deref().unwrap_or("-");
+            let creator_profile_url = note.creator_profile_url.as_deref().unwrap_or("-");
             writeln!(
                 f,
                 "  {}",
@@ -253,7 +253,7 @@ impl fmt::Display for CollectionResult {
                     title = &note.title,
                     creator = creator,
                     note_url = note_url,
-                    profile_url = profile_url,
+                    creator_profile_url = creator_profile_url,
                 )
             )?;
         }

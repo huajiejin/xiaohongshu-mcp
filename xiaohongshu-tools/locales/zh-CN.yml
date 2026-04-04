@@ -42,7 +42,7 @@ auth:
 
 collection:
   matched_notes: "匹配到 %{count} 篇笔记，用时 %{time} 秒（采集时间: %{collected_at}）"
-  note_line: "%{index}. %{title} | 创作者: %{creator} | 笔记: %{note_url} | 主页: %{profile_url}"
+  note_line: "%{index}. %{title} | 创作者: %{creator} | 笔记: %{note_url} | 创作者主页: %{creator_profile_url}"
 
 explore:
   not_logged_in_warn: "未登录，内容可能受限。请先运行 'xhs auth login'。"

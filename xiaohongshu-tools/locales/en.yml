@@ -42,7 +42,7 @@ auth:
 
 collection:
   matched_notes: "Matched %{count} notes in %{time}s (collected at %{collected_at})"
-  note_line: "%{index}. %{title} | creator: %{creator} | note_url: %{note_url} | profile: %{profile_url}"
+  note_line: "%{index}. %{title} | creator: %{creator} | note_url: %{note_url} | creator_profile_url: %{creator_profile_url}"
 
 explore:
   not_logged_in_warn: "not logged in, content may be limited. Run 'xhs auth login' first."
