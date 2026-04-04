@@ -236,7 +236,7 @@ pub async fn run(
     let url = SEARCH_URL_TEMPLATE.replace("{keyword}", &urlencoding::encode(&opts.query));
 
     let mut browser = browser::create_browser(browser_opts).await?;
-    let page = browser::create_page_with_cookies(&browser, &url).await?;
+    let page = browser::create_page_with_cookies(&browser, &url, &browser_opts.profile).await?;
 
     wait_initial_state(&page).await?;
 

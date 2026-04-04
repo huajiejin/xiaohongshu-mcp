@@ -31,7 +31,8 @@ pub async fn run(
     token: &CancellationToken,
 ) -> Result<CollectionResult, anyhow::Error> {
     let mut browser = browser::create_browser(browser_opts).await?;
-    let page = browser::create_page_with_cookies(&browser, EXPLORE_URL).await?;
+    let page =
+        browser::create_page_with_cookies(&browser, EXPLORE_URL, &browser_opts.profile).await?;
 
     check_login(&page).await;
 

@@ -4,6 +4,7 @@ cli:
   headless_help: "以无头模式运行浏览器"
   proxy_help: "代理服务器地址"
   lang_help: "语言: en, zh-CN"
+  profile_help: "账号配置名称（默认: default）"
   keywords_help: "仅与匹配这些关键词的笔记互动"
   exclude_help: "跳过匹配这些关键词的笔记"
   max_notes_help: "匹配 N 篇笔记后停止"

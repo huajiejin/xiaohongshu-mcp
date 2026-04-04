@@ -33,7 +33,8 @@ pub async fn run(
         parse_creator_link(&opts.url).ok_or_else(|| anyhow!("{}", t!("creator.invalid_url")))?;
 
     let mut browser = browser::create_browser(browser_opts).await?;
-    let page = browser::create_page_with_cookies(&browser, &opts.url).await?;
+    let page =
+        browser::create_page_with_cookies(&browser, &opts.url, &browser_opts.profile).await?;
 
     wait_initial_state(&page).await?;
 

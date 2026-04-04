@@ -1,5 +1,5 @@
 use super::cookies::{self, Cookie};
-use crate::t;
+use crate::{browser, t};
 use anyhow::{Result, anyhow};
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::cdp::browser_protocol::network::{
@@ -22,10 +22,10 @@ const COMMON_VIEWPORTS: [(u32, u32); 6] = [
     (1600, 900),
 ];
 
-#[derive(Default)]
 pub struct BrowserOptions {
     pub headless: bool,
     pub proxy: Option<String>,
+    pub profile: String,
 }
 
 fn mask_proxy_credentials(url: &str) -> String {
@@ -175,11 +175,13 @@ fn build_config(
         .map(|c| (c, user_data_dir))
 }
 
-pub async fn create_page_with_cookies(browser: &Browser, url: &str) -> Result<Page> {
+pub async fn create_page_with_cookies(browser: &Browser, url: &str, profile: &str) -> Result<Page> {
     let page = browser.new_page("about:blank").await?;
     page.enable_stealth_mode().await?;
 
-    let cookies = cookies::load_cookies()?;
+    browser::clear_browser_cookies(&page).await?;
+
+    let cookies = cookies::load_cookies(profile)?;
     if !cookies.is_empty() {
         let cdp_cookies: Vec<CookieParam> = cookies
             .iter()

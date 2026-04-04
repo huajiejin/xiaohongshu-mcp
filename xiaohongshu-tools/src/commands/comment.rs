@@ -80,7 +80,8 @@ pub async fn run(
     debug!("{action_label}: note_id={note_id}");
 
     let browser = browser::create_browser(browser_opts).await?;
-    let page = browser::create_page_with_cookies(&browser, &opts.url).await?;
+    let page =
+        browser::create_page_with_cookies(&browser, &opts.url, &browser_opts.profile).await?;
 
     wait_note_page(&page).await?;
     check_note_page_accessible(&page).await?;

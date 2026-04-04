@@ -26,6 +26,9 @@ struct Cli {
     #[arg(long, global = true)]
     lang: Option<String>,
 
+    #[arg(long, global = true, default_value = "default")]
+    profile: String,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -175,7 +178,8 @@ fn build_command() -> clap::Command {
         .mut_arg("headless", |a| a.help(i18n::cli_headless_help()))
         .mut_arg("proxy", |a| a.help(i18n::cli_proxy_help()))
         .mut_arg("format", |a| a.help(i18n::cli_format_help()))
-        .mut_arg("lang", |a| a.help(i18n::cli_lang_help()));
+        .mut_arg("lang", |a| a.help(i18n::cli_lang_help()))
+        .mut_arg("profile", |a| a.help(i18n::cli_profile_help()));
 
     let cmd = cmd.mut_subcommand("auth", |s| {
         s.about(i18n::cli_auth_about())
@@ -286,6 +290,7 @@ async fn main() -> anyhow::Result<()> {
     let opts = BrowserOptions {
         headless: cli.headless,
         proxy: cli.proxy,
+        profile: cli.profile,
     };
 
     let token = CancellationToken::new();
@@ -463,7 +468,7 @@ async fn run_command(
         }
         Commands::Open { url } => {
             let mut browser = create_browser(opts).await?;
-            let page = create_page_with_cookies(&browser, &url).await?;
+            let page = create_page_with_cookies(&browser, &url, &opts.profile).await?;
             println!("{}", i18n::cli_open_about());
 
             let browser_closed = xiaohongshu_tools::shared::utils::wait_for_page_close(

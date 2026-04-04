@@ -4,6 +4,7 @@ cli:
   headless_help: "Run browser in headless mode"
   proxy_help: "Proxy server URL"
   lang_help: "Language: en, zh-CN"
+  profile_help: "Account profile name (default: default)"
   keywords_help: "Only interact with notes matching these keywords"
   exclude_help: "Skip notes matching these keywords"
   max_notes_help: "Stop after N matched notes"

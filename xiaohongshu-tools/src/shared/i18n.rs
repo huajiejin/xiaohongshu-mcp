@@ -44,6 +44,9 @@ pub fn cli_format_help() -> String {
 pub fn cli_lang_help() -> String {
     t!("cli.lang_help").to_string()
 }
+pub fn cli_profile_help() -> String {
+    t!("cli.profile_help").to_string()
+}
 pub fn cli_keywords_help() -> String {
     t!("cli.keywords_help").to_string()
 }

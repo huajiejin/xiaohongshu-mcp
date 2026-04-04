@@ -54,12 +54,12 @@ pub async fn login(opts: &BrowserOptions, token: &CancellationToken) -> Result<L
     debug!("Opening browser for login...");
 
     let mut browser = browser::create_browser(opts).await?;
-    let page = browser::create_page_with_cookies(&browser, XHS_URL).await?;
+    let page = browser::create_page_with_cookies(&browser, XHS_URL, &opts.profile).await?;
 
     if is_logged_in(&page).await? {
         debug!("Already logged in!");
         let cookies = browser::extract_cookies(&page).await?;
-        cookies::save_cookies(&cookies)?;
+        cookies::save_cookies(&opts.profile, &cookies)?;
         browser.close().await?;
         return Ok(LoginResult { logged_in: true });
     }
@@ -84,7 +84,7 @@ pub async fn login(opts: &BrowserOptions, token: &CancellationToken) -> Result<L
             Ok(true) => {
                 debug!("Login successful!");
                 let cookies = browser::extract_cookies(&page).await?;
-                cookies::save_cookies(&cookies)?;
+                cookies::save_cookies(&opts.profile, &cookies)?;
                 debug!("Cookies saved");
                 break;
             }
@@ -101,11 +101,12 @@ pub async fn login(opts: &BrowserOptions, token: &CancellationToken) -> Result<L
 }
 
 pub async fn logout(opts: &BrowserOptions) -> Result<LogoutResult> {
-    cookies::delete_cookies()?;
+    cookies::delete_cookies(&opts.profile)?;
 
     let headless_opts = BrowserOptions {
         headless: true,
         proxy: opts.proxy.clone(),
+        profile: opts.profile.clone(),
     };
     let mut browser = browser::create_browser(&headless_opts).await?;
     let page = browser.new_page("about:blank").await?;
@@ -119,12 +120,12 @@ pub async fn logout(opts: &BrowserOptions) -> Result<LogoutResult> {
 }
 
 pub async fn check_status(opts: &BrowserOptions) -> Result<StatusResult> {
-    if !cookies::cookies_exist() {
+    if !cookies::cookies_exist(&opts.profile) {
         return Ok(StatusResult { logged_in: false });
     }
 
     let mut browser = browser::create_browser(opts).await?;
-    let page = browser::create_page_with_cookies(&browser, XHS_URL).await?;
+    let page = browser::create_page_with_cookies(&browser, XHS_URL, &opts.profile).await?;
 
     let logged_in = is_logged_in(&page).await?;
     browser.close().await?;
