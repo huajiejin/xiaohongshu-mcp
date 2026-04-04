@@ -1,8 +1,8 @@
 use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
-use crate::commands::interact;
 use crate::commands::support::{
-    StagnationAction, StagnationTracker, StopCondition, card_unique_key, process_card_batch,
+    InteractTracker, StagnationAction, StagnationTracker, StopCondition, interact_with_cards,
+    process_card_batch,
 };
 use crate::extract::note::{
     CollectionResult, ExtractionRoot, Note, NoteCard, extract_note_cards_with_fallback,
@@ -253,7 +253,7 @@ pub async fn run(
     }
 
     let mut seen_keys: HashSet<String> = HashSet::new();
-    let mut interacted_keys: HashSet<String> = HashSet::new();
+    let mut interact_tracker = InteractTracker::new();
     let mut cards: Vec<NoteCard> = Vec::new();
     let start = Instant::now();
     let stop = StopCondition::new(opts.max_notes, opts.duration);
@@ -280,17 +280,7 @@ pub async fn run(
         let new_cards = process_card_batch(batch, &mut seen_keys, &[], &[], &mut cards);
 
         if opts.interact {
-            for card in &new_cards {
-                let key = card_unique_key(card);
-                if interacted_keys.contains(&key) {
-                    continue;
-                }
-                interacted_keys.insert(key);
-
-                if let Err(e) = interact_with_note(&page, card, &mut human).await {
-                    warn!("{}", t!("explore.explore_note_failed", e = e.to_string()));
-                }
-            }
+            interact_with_cards(&mut interact_tracker, &page, &new_cards, &mut human).await;
         }
 
         if stop.check(cards.len(), start) {
@@ -336,15 +326,6 @@ pub async fn run(
         duration_secs,
         collected_at: collected_at.to_rfc3339(),
     })
-}
-
-async fn interact_with_note(
-    page: &Page,
-    card: &NoteCard,
-    human: &mut HumanBehavior,
-) -> Result<(), anyhow::Error> {
-    interact::open_note(page, card).await?;
-    interact::browse_note(page, human).await
 }
 
 async fn wait_initial_state(page: &Page) -> Result<()> {

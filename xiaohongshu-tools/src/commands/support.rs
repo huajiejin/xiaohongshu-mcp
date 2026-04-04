@@ -1,7 +1,11 @@
+use crate::browser::human::HumanBehavior;
+use crate::commands::interact;
 use crate::extract::note::NoteCard;
+use crate::t;
+use chromiumoxide::page::Page;
 use std::collections::HashSet;
 use std::time::Instant;
-use tracing::debug;
+use tracing::{debug, warn};
 
 pub struct StopCondition {
     max_items: usize,
@@ -105,10 +109,71 @@ impl StagnationTracker {
 }
 
 pub fn card_unique_key(card: &NoteCard) -> String {
-    if let Some(id) = &card.id {
+    if let Some(id) = &card.id
+        && !id.is_empty()
+    {
         return format!("id:{id}");
     }
     format!("title:{}", card.title)
+}
+
+const INTERACT_EVERY_N: usize = 5;
+
+pub struct InteractTracker {
+    interacted_keys: HashSet<String>,
+    total_seen: usize,
+}
+
+impl Default for InteractTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InteractTracker {
+    pub fn new() -> Self {
+        Self {
+            interacted_keys: HashSet::new(),
+            total_seen: 0,
+        }
+    }
+
+    pub fn should_interact(&mut self, card: &NoteCard) -> bool {
+        let key = card_unique_key(card);
+        if self.interacted_keys.contains(&key) {
+            return false;
+        }
+        self.total_seen += 1;
+        if !self.total_seen.is_multiple_of(INTERACT_EVERY_N) {
+            return false;
+        }
+        self.interacted_keys.insert(key);
+        true
+    }
+}
+
+pub async fn interact_with_note(
+    page: &Page,
+    card: &NoteCard,
+    human: &mut HumanBehavior,
+) -> Result<(), anyhow::Error> {
+    interact::open_note(page, card).await?;
+    interact::browse_note(page, human).await
+}
+
+pub async fn interact_with_cards(
+    tracker: &mut InteractTracker,
+    page: &Page,
+    new_cards: &[NoteCard],
+    human: &mut HumanBehavior,
+) {
+    for card in new_cards {
+        if tracker.should_interact(card)
+            && let Err(e) = interact_with_note(page, card, human).await
+        {
+            warn!("{}", t!("explore.explore_note_failed", e = e.to_string()));
+        }
+    }
 }
 
 pub fn process_card_batch(
