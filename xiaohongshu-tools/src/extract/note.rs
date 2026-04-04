@@ -777,6 +777,7 @@ pub struct NoteDetailRaw {
     pub comment_count: Option<String>,
     pub shared_count: Option<String>,
     pub images: Vec<NoteImage>,
+    pub video_url: Option<String>,
     pub comments: Vec<CommentRaw>,
     pub comments_cursor: Option<String>,
     pub comments_has_more: Option<bool>,
@@ -853,7 +854,7 @@ impl NoteDetail {
             comment_count: raw.comment_count.as_deref().and_then(parse_count),
             shared_count: raw.shared_count.as_deref().and_then(parse_count),
             images: raw.images.clone(),
-            video_url: None,
+            video_url: raw.video_url.clone(),
             comments,
             comments_loaded,
             comments_has_more: raw.comments_has_more,
@@ -1067,6 +1068,7 @@ pub fn parse_note_detail_raw(
             .and_then(|i| i.get("sharedCount"))
             .and_then(value_to_text),
         images: parse_image_list(note.get("imageList")),
+        video_url: extract_video_url(note),
         comments: comments_data
             .and_then(|c| c.get("list"))
             .and_then(|l| l.as_array())
@@ -1100,6 +1102,44 @@ fn parse_image_list(image_list: Option<&serde_json::Value>) -> Vec<NoteImage> {
             })
         })
         .collect()
+}
+
+fn extract_video_url(note: &serde_json::Value) -> Option<String> {
+    let video = note.get("video")?;
+    let stream = video.get("media").and_then(|m| m.get("stream"))?;
+
+    let try_codec = |codec: &str| -> Option<String> {
+        let mut entries: Vec<&serde_json::Value> = stream
+            .get(codec)
+            .and_then(serde_json::Value::as_array)?
+            .iter()
+            .filter(|v| {
+                v.get("masterUrl")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some()
+            })
+            .collect();
+        entries.sort_by(|a, b| {
+            let ta = a
+                .get("streamType")
+                .and_then(serde_json::Value::as_i64)
+                .unwrap_or(0);
+            let tb = b
+                .get("streamType")
+                .and_then(serde_json::Value::as_i64)
+                .unwrap_or(0);
+            tb.cmp(&ta)
+        });
+        entries
+            .first()
+            .and_then(|v| v.get("masterUrl"))
+            .and_then(serde_json::Value::as_str)
+            .map(String::from)
+    };
+
+    try_codec("h265")
+        .or_else(|| try_codec("av1"))
+        .or_else(|| try_codec("h264"))
 }
 
 fn parse_comment_raw(value: &serde_json::Value) -> Option<CommentRaw> {
@@ -1151,20 +1191,6 @@ fn str_field(parent: &serde_json::Value, key: &str) -> Option<String> {
         .and_then(serde_json::Value::as_str)
         .filter(|s| !s.is_empty())
         .map(String::from)
-}
-
-pub async fn extract_video_url_from_dom(page: &Page) -> Result<Option<String>> {
-    let js = r#"(() => {
-        const video = document.querySelector('video');
-        if (!video) return null;
-        return video.src || video.querySelector('source')?.src || null;
-    })()"#;
-
-    let result = page.evaluate_expression(js).await?;
-    match result.value() {
-        Some(serde_json::Value::String(s)) if !s.is_empty() => Ok(Some(s.clone())),
-        _ => Ok(None),
-    }
 }
 
 fn parse_timestamp_ms(raw: &str) -> Option<String> {

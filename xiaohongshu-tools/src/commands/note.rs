@@ -2,8 +2,8 @@ use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
 use crate::commands::support::{StagnationAction, StagnationTracker, StopCondition};
 use crate::extract::note::{
-    NoteDetail, NoteResult, check_note_page_accessible, extract_note_detail_map,
-    extract_video_url_from_dom, parse_link_parts, parse_note_detail_raw,
+    NoteDetail, NoteResult, check_note_page_accessible, extract_note_detail_map, parse_link_parts,
+    parse_note_detail_raw,
 };
 use crate::t;
 use anyhow::{Result, anyhow};
@@ -43,16 +43,6 @@ pub async fn run(
 
     debug!("extracted note detail: note_id={note_id}");
 
-    let video_url = if raw.note_type.as_deref() == Some("video") {
-        extract_video_url_from_dom(&page)
-            .await
-            .ok()
-            .flatten()
-            .inspect(|url| debug!("extracted video url: {url}"))
-    } else {
-        None
-    };
-
     let initial_comment_count = raw.comments.len();
     let needs_scroll = opts.max_comments > 0 && initial_comment_count < opts.max_comments;
 
@@ -79,7 +69,6 @@ pub async fn run(
         comment.sub_comments.truncate(opts.max_replies);
     }
     detail.comments_loaded = detail.comments.len();
-    detail.video_url = video_url;
     detail.note_url = Some(opts.url.clone());
 
     let duration_secs = start.elapsed().as_secs_f64();
