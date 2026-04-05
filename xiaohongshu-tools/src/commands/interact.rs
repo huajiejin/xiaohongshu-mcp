@@ -1,5 +1,6 @@
 use crate::browser::human::HumanBehavior;
 use crate::extract::note::NoteCard;
+use crate::selectors::{COMMENT_CONTAINER_SELECTORS, Selector};
 use crate::t;
 use anyhow::{Result, anyhow};
 use chromiumoxide::page::Page;
@@ -7,17 +8,9 @@ use rand::Rng;
 use std::time::Duration;
 use tracing::warn;
 
-const CLOSE_BTN_SELECTOR: &str = "body > div.note-detail-mask > div.close-circle";
-
-const COMMENT_CONTAINER_SELECTORS: &[&str] = &[
-    "#noteContainer div.interaction-container > div.note-scroller",
-    "#noteContainer div.interaction-container",
-    "#noteContainer",
-];
-
 pub async fn open_note(page: &Page, card: &NoteCard) -> Result<()> {
     if let Some(note_id) = &card.id {
-        let selector = format!("a.cover[href*='/{note_id}']");
+        let selector = crate::selectors::note_cover_by_id_selector(note_id);
         if let Ok(el) = page.find_element(&selector).await {
             el.click().await?;
             return Ok(());
@@ -34,7 +27,13 @@ pub async fn browse_note(page: &Page, human: &mut HumanBehavior) -> Result<()> {
     human.random_delay(human.config.short_read.clone()).await;
 
     if let Err(e) = human
-        .scroll_container(page, COMMENT_CONTAINER_SELECTORS)
+        .scroll_container(
+            page,
+            &COMMENT_CONTAINER_SELECTORS
+                .iter()
+                .map(|s| s.css())
+                .collect::<Vec<_>>(),
+        )
         .await
     {
         warn!(
@@ -57,7 +56,7 @@ pub async fn browse_note(page: &Page, human: &mut HumanBehavior) -> Result<()> {
 }
 
 pub async fn close_note_detail(page: &Page) {
-    if let Ok(btn) = page.find_element(CLOSE_BTN_SELECTOR).await
+    if let Ok(btn) = page.find_element(Selector::CloseBtn.css()).await
         && btn.click().await.is_ok()
     {
         return;

@@ -3,6 +3,7 @@ use crate::browser::{self, BrowserOptions};
 use crate::extract::note::{
     check_note_page_accessible, extract_note_detail_map, parse_link_parts, parse_note_detail_raw,
 };
+use crate::selectors::Selector;
 use crate::t;
 use anyhow::{Result, anyhow};
 use serde::Serialize;
@@ -17,10 +18,10 @@ pub enum InteractionKind {
 }
 
 impl InteractionKind {
-    const fn selector(self) -> &'static str {
+    fn selector(self) -> &'static str {
         match self {
-            Self::Like => ".interact-container .left .like-lottie",
-            Self::Favorite => ".interact-container .left .reds-icon.collect-icon",
+            Self::Like => Selector::LikeButton.css(),
+            Self::Favorite => Selector::FavoriteButton.css(),
         }
     }
 

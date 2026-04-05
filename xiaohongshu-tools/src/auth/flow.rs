@@ -1,6 +1,7 @@
 use super::login_image;
 use crate::browser::cookies;
 use crate::browser::{self, BrowserOptions};
+use crate::selectors::Selector;
 use crate::t;
 use anyhow::Result;
 use chromiumoxide::page::Page;
@@ -11,7 +12,6 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
 const XHS_URL: &str = "https://www.xiaohongshu.com";
-const LOGIN_SELECTOR: &str = ".main-container .user .link-wrapper .channel";
 
 const JS_EXTRACT_USER_INFO: &str = r#"(() => {
     const s = window.__INITIAL_STATE__;
@@ -230,7 +230,7 @@ pub async fn check_status(opts: &BrowserOptions) -> Result<StatusResult> {
 }
 
 async fn is_logged_in(page: &Page) -> Result<bool> {
-    let element = page.find_element(LOGIN_SELECTOR).await;
+    let element = page.find_element(Selector::LoginIndicator.css()).await;
     Ok(element.is_ok())
 }
 

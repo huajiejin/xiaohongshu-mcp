@@ -4,6 +4,7 @@ pub mod auth;
 pub mod browser;
 pub mod commands;
 pub mod extract;
+pub mod selectors;
 pub mod shared;
 
 pub use rust_i18n::t;

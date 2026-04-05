@@ -1,6 +1,7 @@
 use crate::browser::human::HumanBehavior;
 use crate::commands::interact;
 use crate::extract::note::NoteCard;
+use crate::selectors::Selector;
 use crate::t;
 use chromiumoxide::page::Page;
 use std::collections::HashSet;
@@ -221,7 +222,7 @@ pub async fn click_show_more_buttons(
     max_replies: usize,
     human: &mut HumanBehavior,
 ) {
-    let buttons = match page.find_elements(".show-more").await {
+    let buttons = match page.find_elements(Selector::ShowMore.css()).await {
         Ok(v) => v,
         Err(_) => return,
     };

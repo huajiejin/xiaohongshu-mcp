@@ -1,3 +1,4 @@
+use crate::selectors::Selector;
 use crate::shared::utils::poll_until;
 use crate::t;
 use anyhow::{Result, anyhow};
@@ -54,7 +55,7 @@ pub fn classify_accept(accept: &str) -> FileInputKind {
 
 pub async fn find_file_inputs(page: &Page) -> Result<FileInputs> {
     let elements = page
-        .find_elements(r#"input[type="file"]"#)
+        .find_elements(Selector::FileInput.css())
         .await
         .map_err(|e| anyhow!("no file inputs found: {e}"))?;
 

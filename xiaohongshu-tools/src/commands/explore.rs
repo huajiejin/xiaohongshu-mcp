@@ -7,6 +7,7 @@ use crate::commands::support::{
 use crate::extract::note::{
     CollectionResult, ExtractionRoot, Note, NoteCard, extract_note_cards_with_fallback,
 };
+use crate::selectors::Selector;
 use crate::t;
 use chromiumoxide::page::Page;
 use std::collections::HashSet;
@@ -128,7 +129,7 @@ pub async fn run(
 
 async fn check_login(page: &Page) {
     let logged_in = page
-        .find_element(".main-container .user .link-wrapper .channel")
+        .find_element(Selector::LoginIndicator.css())
         .await
         .is_ok();
     if !logged_in {

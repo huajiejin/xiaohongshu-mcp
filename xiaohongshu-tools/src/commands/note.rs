@@ -7,6 +7,7 @@ use crate::extract::note::{
     NoteDetail, NoteResult, check_note_page_accessible, extract_note_detail_map, parse_link_parts,
     parse_note_detail_raw,
 };
+use crate::selectors::Selector;
 use crate::t;
 use anyhow::{Result, anyhow};
 use std::time::{Duration, Instant};
@@ -194,24 +195,31 @@ async fn wait_note_page(page: &chromiumoxide::page::Page) -> Result<()> {
 }
 
 async fn scroll_to_comments_area(page: &chromiumoxide::page::Page) {
-    let js = r#"(() => {
-        const el = document.querySelector('.comments-container')
-            || document.querySelector('.interaction-container');
-        if (el) {
-            el.scrollIntoView({behavior:'smooth', block:'start'});
-            return true;
-        }
-        return false;
-    })()"#;
+    let js = format!(
+        r#"(() => {{
+            const el = {}
+                || {};
+            if (el) {{
+                el.scrollIntoView({{behavior:'smooth', block:'start'}});
+                return true;
+            }}
+            return false;
+        }})()"#,
+        Selector::CommentsContainer.js_query(),
+        Selector::InteractionContainer.js_query(),
+    );
     let _ = page.evaluate_expression(js).await;
 }
 
 async fn check_no_comments(page: &chromiumoxide::page::Page) -> bool {
-    let js = r#"(() => {
-        const el = document.querySelector('.no-comments-text');
-        if (!el) return false;
-        return el.innerText.includes('荒地');
-    })()"#;
+    let js = format!(
+        r#"(() => {{
+            const el = {};
+            if (!el) return false;
+            return el.innerText.includes('荒地');
+        }})()"#,
+        Selector::NoCommentsText.js_query()
+    );
     page.evaluate_expression(js)
         .await
         .ok()
@@ -221,11 +229,14 @@ async fn check_no_comments(page: &chromiumoxide::page::Page) -> bool {
 }
 
 async fn check_end_container(page: &chromiumoxide::page::Page) -> bool {
-    let js = r#"(() => {
-        const el = document.querySelector('.end-container');
-        if (!el) return false;
-        return el.innerText.includes('THE END');
-    })()"#;
+    let js = format!(
+        r#"(() => {{
+            const el = {};
+            if (!el) return false;
+            return el.innerText.includes('THE END');
+        }})()"#,
+        Selector::EndContainer.js_query()
+    );
     page.evaluate_expression(js)
         .await
         .ok()
@@ -235,9 +246,12 @@ async fn check_end_container(page: &chromiumoxide::page::Page) -> bool {
 }
 
 async fn count_dom_comments(page: &chromiumoxide::page::Page) -> usize {
-    let js = r#"(() => {
-        return document.querySelectorAll('.parent-comment').length;
-    })()"#;
+    let js = format!(
+        r#"(() => {{
+            return {}.length;
+        }})()"#,
+        Selector::ParentComment.js_query_all()
+    );
     page.evaluate_expression(js)
         .await
         .ok()

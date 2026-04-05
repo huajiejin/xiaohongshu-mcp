@@ -2,6 +2,7 @@ use crate::browser::human::{HumanBehavior, ScrollSpeed};
 use crate::browser::{self, BrowserOptions};
 use crate::commands::support::{StagnationAction, StagnationTracker, click_show_more_buttons};
 use crate::extract::note::{check_note_page_accessible, parse_link_parts};
+use crate::selectors::{self as sel, Selector};
 use crate::shared::utils::ApiResponseWatcher;
 use crate::t;
 use anyhow::{Result, anyhow};
@@ -146,13 +147,13 @@ async fn find_comment_id_by_text(page: &Page, note_id: &str, text: &str) -> Opti
 
 async fn post_comment(page: &Page, text: &str, human: &mut HumanBehavior) -> Result<()> {
     let trigger = page
-        .find_element("div.input-box div.content-edit span")
+        .find_element(Selector::CommentInputTrigger.css())
         .await
         .map_err(|e| anyhow!("{}", t!("comment.input_not_found", error = e.to_string())))?;
     human.human_click(page, &trigger).await?;
 
     let input = page
-        .find_element("div.input-box div.content-edit p.content-input")
+        .find_element(Selector::CommentInputField.css())
         .await
         .map_err(|e| anyhow!("{}", t!("comment.input_not_found", error = e.to_string())))?;
     human.human_type_text(page, &input, text).await?;
@@ -172,7 +173,7 @@ async fn post_reply(
     let comment_el = find_comment_element(page, comment_id, human).await?;
 
     let reply_btn = comment_el
-        .find_element(".right .interactions .reply")
+        .find_element(Selector::ReplyButton.css())
         .await
         .map_err(|e| {
             anyhow!(
@@ -183,7 +184,7 @@ async fn post_reply(
     human.human_click(page, &reply_btn).await?;
 
     let input = page
-        .find_element("div.input-box div.content-edit p.content-input")
+        .find_element(Selector::CommentInputField.css())
         .await
         .map_err(|e| anyhow!("{}", t!("comment.input_not_found", error = e.to_string())))?;
     human.human_type_text(page, &input, text).await?;
@@ -193,7 +194,7 @@ async fn post_reply(
 
 async fn click_submit(page: &Page, human: &mut HumanBehavior) -> Result<()> {
     let submit = page
-        .find_element("div.bottom button.submit")
+        .find_element(Selector::SubmitButton.css())
         .await
         .map_err(|e| anyhow!("{}", t!("comment.submit_not_found", error = e.to_string())))?;
     human.human_click(page, &submit).await?;
@@ -205,7 +206,7 @@ async fn find_comment_element(
     comment_id: &str,
     human: &mut HumanBehavior,
 ) -> Result<chromiumoxide::element::Element> {
-    let direct_selector = format!("#comment-{comment_id}");
+    let direct_selector = sel::comment_by_id_selector(comment_id);
     if let Ok(el) = page.find_element(&direct_selector).await {
         debug!("found comment by id selector: {direct_selector}");
         return Ok(el);
@@ -279,36 +280,46 @@ async fn find_comment_element(
 async fn scroll_note_container(page: &Page, delta: i64) {
     let js = format!(
         r#"(() => {{
-            const el = document.querySelector('.note-scroller')
-                || document.querySelector('.interaction-container')
+            const el = {}
+                || {}
                 || document.documentElement;
             el.scrollBy({{top: {delta}, behavior: 'smooth'}});
-        }})()"#
+        }})()"#,
+        Selector::CommentScrollerPrimary.js_query(),
+        Selector::InteractionContainer.js_query(),
     );
     let _ = page.evaluate_expression(&js).await;
 }
 
 async fn scroll_to_comments_area(page: &Page) {
-    let js = r#"(() => {
-        const el = document.querySelector('.comments-container')
-            || document.querySelector('.interaction-container');
-        if (el) {
-            el.scrollIntoView({behavior:'smooth', block:'start'});
-            const scroller = document.querySelector('.note-scroller') || el;
-            scroller.dispatchEvent(new WheelEvent('wheel',{
-                deltaY:300,deltaMode:0,bubbles:true,cancelable:true,view:window
-            }));
-            return true;
-        }
-        return false;
-    })()"#;
+    let js = format!(
+        r#"(() => {{
+            const el = {}
+                || {};
+            if (el) {{
+                el.scrollIntoView({{behavior:'smooth', block:'start'}});
+                const scroller = {} || el;
+                scroller.dispatchEvent(new WheelEvent('wheel',{{
+                    deltaY:300,deltaMode:0,bubbles:true,cancelable:true,view:window
+                }}));
+                return true;
+            }}
+            return false;
+        }})()"#,
+        Selector::CommentsContainer.js_query(),
+        Selector::InteractionContainer.js_query(),
+        Selector::CommentScrollerPrimary.js_query(),
+    );
     let _ = page.evaluate_expression(js).await;
 }
 
 async fn count_dom_comments(page: &Page) -> usize {
-    let js = r#"(() => {
-        return document.querySelectorAll('.parent-comment').length;
-    })()"#;
+    let js = format!(
+        r#"(() => {{
+            return {}.length;
+        }})()"#,
+        Selector::ParentComment.js_query_all()
+    );
     page.evaluate_expression(js)
         .await
         .ok()

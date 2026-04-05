@@ -7,6 +7,7 @@ use crate::commands::support::{
 use crate::extract::note::{
     CollectionResult, ExtractionRoot, Note, NoteCard, extract_note_cards_with_fallback,
 };
+use crate::selectors::{self as sel, Selector};
 use crate::shared::utils::ApiResponseWatcher;
 use crate::t;
 use anyhow::{Result, anyhow};
@@ -135,10 +136,7 @@ struct FilterClick {
 
 impl FilterClick {
     fn selector(&self) -> String {
-        format!(
-            "div.filter-panel div.filters:nth-child({}) div.tags:nth-child({})",
-            self.group, self.tag
-        )
+        sel::filter_option_selector(self.group, self.tag)
     }
 }
 
@@ -362,7 +360,7 @@ async fn apply_filters(page: &Page, opts: &SearchOptions, human: &mut HumanBehav
             .await?;
 
     let filter_btn = page
-        .find_element("div.filter")
+        .find_element(Selector::FilterButton.css())
         .await
         .map_err(|_| anyhow!(t!("search.filter_button_not_found")))?;
 
@@ -444,15 +442,18 @@ fn collect_filter_clicks(opts: &SearchOptions) -> Vec<FilterClick> {
 }
 
 async fn wait_for_filter_panel(page: &Page) -> bool {
-    let js = r#"(() => {
-        return document.querySelector('div.filter-panel') !== null;
-    })()"#;
+    let js = format!(
+        r#"(() => {{
+            return {} !== null;
+        }})()"#,
+        Selector::FilterPanel.js_query()
+    );
 
     let timeout = Duration::from_secs(10);
     let start = Instant::now();
     loop {
         let ready = page
-            .evaluate_expression(js)
+            .evaluate_expression(&js)
             .await
             .ok()
             .and_then(|v| v.into_value::<serde_json::Value>().ok())

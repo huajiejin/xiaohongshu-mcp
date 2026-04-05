@@ -1,3 +1,4 @@
+use crate::selectors::Selector;
 use crate::shared::utils;
 use crate::t;
 use anyhow::{Result, anyhow};
@@ -6,8 +7,6 @@ use std::env;
 use std::fs;
 use std::time::Duration;
 use tracing::{debug, info};
-
-const IMAGE_SELECTOR: &str = ".qrcode-img";
 
 const WAIT_TIMEOUT: Duration = Duration::from_secs(15);
 const POLL_INTERVAL: Duration = Duration::from_millis(500);
@@ -23,7 +22,7 @@ async fn fetch_image_bytes(page: &Page) -> Result<Vec<u8>> {
     utils::poll_until(WAIT_TIMEOUT, POLL_INTERVAL, || {
         let p = p.clone();
         async move {
-            let element = p.find_element(IMAGE_SELECTOR).await.ok()?;
+            let element = p.find_element(Selector::QrCodeImage.css()).await.ok()?;
             let src = element.attribute("src").await.ok()??;
             if src.is_empty() {
                 return None;

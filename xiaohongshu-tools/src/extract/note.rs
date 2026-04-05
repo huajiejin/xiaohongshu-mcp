@@ -1,3 +1,4 @@
+use crate::selectors::Selector;
 use crate::shared::parse::{parse_count, parse_publish_time};
 use crate::t;
 use anyhow::Result;
@@ -6,7 +7,6 @@ use serde::Serialize;
 use std::fmt;
 
 const XHS_DOMAIN: &str = "https://www.xiaohongshu.com";
-const EXPLORE_SECTIONS_SELECTOR: &str = "#exploreFeeds section";
 const XSEC_SOURCE_PC_SEARCH: &str = "pc_search";
 const XSEC_SOURCE_PC_FEED: &str = "pc_feed";
 const XSEC_SOURCE_PC_USER: &str = "pc_user";
@@ -461,14 +461,14 @@ pub async fn extract_note_cards_from_initial_state(
 }
 
 pub async fn extract_note_cards_from_dom(page: &Page) -> Result<Vec<NoteCard>> {
-    let sections = match page.find_elements(EXPLORE_SECTIONS_SELECTOR).await {
+    let sections = match page.find_elements(Selector::ExploreSections.css()).await {
         Ok(v) => v,
         Err(_) => return Ok(Vec::new()),
     };
 
     let mut cards = Vec::with_capacity(sections.len());
     for section in &sections {
-        let href_raw = match section.find_element("a.cover").await {
+        let href_raw = match section.find_element(Selector::NoteCoverLink.css()).await {
             Ok(a) => a.attribute("href").await.ok().flatten(),
             Err(_) => None,
         };
@@ -476,7 +476,7 @@ pub async fn extract_note_cards_from_dom(page: &Page) -> Result<Vec<NoteCard>> {
             continue;
         };
 
-        let title = match section.find_element("div > div > a > span").await {
+        let title = match section.find_element(Selector::NoteTitleSpan.css()).await {
             Ok(span) => span.inner_text().await.ok().flatten().unwrap_or_default(),
             Err(_) => String::new(),
         };

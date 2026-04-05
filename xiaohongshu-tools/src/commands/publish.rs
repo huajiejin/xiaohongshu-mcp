@@ -1,5 +1,6 @@
 use crate::browser::human::HumanBehavior;
 use crate::browser::{self, BrowserOptions};
+use crate::selectors::Selector;
 use crate::shared::file_input::wait_for_file_inputs;
 use crate::shared::utils::poll_until;
 use crate::t;
@@ -307,19 +308,23 @@ async fn upload_video(page: &Page, video_path: &str, human: &mut HumanBehavior) 
         Duration::from_secs(VIDEO_UPLOAD_TIMEOUT_SECS),
         Duration::from_secs(2),
         || async {
-            let js = r#"(() => {
-                const progress = document.querySelector('.video-upload-progress');
-                if (progress) {
-                    const text = progress.textContent || '';
-                    if (text.includes('100%') || text.includes('上传完成') || text.includes('Upload complete')) {
-                        return 'done';
-                    }
-                    return text;
-                }
-                const preview = document.querySelector('.video-preview, .upload-done, .player-wrapper');
-                if (preview) return 'done';
-                return 'uploading';
-            })()"#;
+            let js = format!(
+                r#"(() => {{
+                    const progress = {};
+                    if (progress) {{
+                        const text = progress.textContent || '';
+                        if (text.includes('100%') || text.includes('上传完成') || text.includes('Upload complete')) {{
+                            return 'done';
+                        }}
+                        return text;
+                    }}
+                    const preview = document.querySelector('{}');
+                    if (preview) return 'done';
+                    return 'uploading';
+                }})()"#,
+                Selector::VideoUploadProgress.js_query(),
+                Selector::VideoPreview.css(),
+            );
             let result = page
                 .evaluate_expression(js)
                 .await
@@ -351,11 +356,7 @@ async fn upload_cover(page: &Page, cover_path: &str, human: &mut HumanBehavior) 
     let cover_el = poll_until(
         Duration::from_secs(10),
         Duration::from_millis(500),
-        || async {
-            page.find_element("div.publish-page-content-cover-content div.cover > div.default")
-                .await
-                .ok()
-        },
+        || async { page.find_element(Selector::CoverDefault.css()).await.ok() },
     )
     .await
     .map_err(|_| anyhow!("{}", t!("publish.cover_modal_not_found")))?;
@@ -403,7 +404,7 @@ async fn upload_cover(page: &Page, cover_path: &str, human: &mut HumanBehavior) 
         Duration::from_millis(500),
         || async {
             let buttons = page
-                .find_elements("#mojito-btn-container button")
+                .find_elements(Selector::CoverConfirmBtn.css())
                 .await
                 .unwrap_or_default();
             for btn in buttons {
@@ -425,7 +426,7 @@ async fn upload_cover(page: &Page, cover_path: &str, human: &mut HumanBehavior) 
         Duration::from_secs(10),
         Duration::from_millis(500),
         || async {
-            let modal_visible = page.find_element("div.d-modal-mask").await.is_ok();
+            let modal_visible = page.find_element(Selector::ModalMask.css()).await.is_ok();
             if modal_visible { None } else { Some(()) }
         },
     )
@@ -493,10 +494,13 @@ async fn wait_creator_page(page: &Page) -> Result<()> {
         Duration::from_secs(30),
         Duration::from_millis(500),
         || async {
-            let js = r#"(() => {
-                const el = document.querySelector('div.upload-content');
-                return el && el.offsetParent !== null;
-            })()"#;
+            let js = format!(
+                r#"(() => {{
+                    const el = {};
+                    return el && el.offsetParent !== null;
+                }})()"#,
+                Selector::UploadContent.js_query()
+            );
             page.evaluate_expression(js)
                 .await
                 .ok()
@@ -521,7 +525,7 @@ async fn click_publish_tab(page: &Page, tab_name: &str, human: &mut HumanBehavio
             remove_popover(page).await;
 
             let elements = page
-                .find_elements(".header-tabs .creator-tab")
+                .find_elements(Selector::CreatorTab.css())
                 .await
                 .unwrap_or_default();
 
@@ -545,10 +549,13 @@ async fn click_publish_tab(page: &Page, tab_name: &str, human: &mut HumanBehavio
 }
 
 async fn remove_popover(page: &Page) {
-    let js = r#"(() => {
-        const pop = document.querySelector('div.d-popover');
-        if (pop) pop.remove();
-    })()"#;
+    let js = format!(
+        r#"(() => {{
+            const pop = {};
+            if (pop) pop.remove();
+        }})()"#,
+        Selector::Popover.js_query()
+    );
     let _ = page.evaluate_expression(js).await;
 }
 
@@ -609,7 +616,7 @@ async fn upload_images(page: &Page, images: &[String], human: &mut HumanBehavior
             Duration::from_millis(500),
             || async {
                 let count = page
-                    .find_elements(".img-preview-area .pr")
+                    .find_elements(Selector::ImagePreview.css())
                     .await
                     .map(|els| els.len())
                     .unwrap_or(0);
@@ -627,19 +634,22 @@ async fn upload_images(page: &Page, images: &[String], human: &mut HumanBehavior
 }
 
 async fn fill_title(page: &Page, title: &str, human: &mut HumanBehavior) -> Result<()> {
-    let input = page.find_element("div.d-input input").await.map_err(|e| {
-        anyhow!(
-            "{}",
-            t!("publish.title_input_not_found", error = e.to_string())
-        )
-    })?;
+    let input = page
+        .find_element(Selector::TitleInput.css())
+        .await
+        .map_err(|e| {
+            anyhow!(
+                "{}",
+                t!("publish.title_input_not_found", error = e.to_string())
+            )
+        })?;
 
     human.human_type_text(page, &input, title).await?;
 
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     let has_max_indicator = page
-        .find_element("div.title-container div.max_suffix")
+        .find_element(Selector::TitleMaxSuffix.css())
         .await
         .is_ok();
 
@@ -664,9 +674,9 @@ async fn fill_content(
     tags: &[String],
     human: &mut HumanBehavior,
 ) -> Result<()> {
-    let content_el = if let Ok(el) = page.find_element(".editor-content p").await {
+    let content_el = if let Ok(el) = page.find_element(Selector::EditorContent.css()).await {
         el
-    } else if let Ok(el) = page.find_element(r#".is-editor-empty"#).await {
+    } else if let Ok(el) = page.find_element(Selector::EditorEmpty.css()).await {
         el
     } else {
         bail!("{}", t!("publish.content_input_not_found"));
@@ -684,7 +694,7 @@ async fn fill_content(
         input_tags(page, &content_el, tags_to_use, human).await?;
     }
 
-    let title_input = page.find_element("div.d-input input").await.ok();
+    let title_input = page.find_element(Selector::TitleInput.css()).await.ok();
     if let Some(title_el) = title_input {
         human.human_click(page, &title_el).await?;
     }
@@ -692,7 +702,7 @@ async fn fill_content(
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     let has_length_error = page
-        .find_element("div.edit-container div.length-error")
+        .find_element(Selector::ContentLengthError.css())
         .await
         .is_ok();
 
@@ -750,9 +760,7 @@ async fn input_tags(
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let topic_found = page
-            .find_element("#creator-editor-topic-container .item")
-            .await;
+        let topic_found = page.find_element(Selector::TopicItem.css()).await;
 
         if let Ok(item) = topic_found {
             human.human_click(page, &item).await?;
@@ -771,7 +779,7 @@ async fn input_tags(
 
 async fn set_schedule(page: &Page, schedule: &str, human: &mut HumanBehavior) -> Result<()> {
     let switch = page
-        .find_element(".post-time-wrapper .d-switch")
+        .find_element(Selector::ScheduleSwitch.css())
         .await
         .map_err(|e| {
             anyhow!(
@@ -786,7 +794,7 @@ async fn set_schedule(page: &Page, schedule: &str, human: &mut HumanBehavior) ->
         .await;
 
     let input = page
-        .find_element(".date-picker-container input")
+        .find_element(Selector::DatePickerInput.css())
         .await
         .map_err(|e| {
             anyhow!(
@@ -824,7 +832,7 @@ async fn set_visibility(page: &Page, visibility: &str, human: &mut HumanBehavior
     }
 
     let dropdown = page
-        .find_element("div.permission-card-wrapper div.d-select-content")
+        .find_element(Selector::VisibilityDropdown.css())
         .await
         .map_err(|e| {
             anyhow!(
@@ -842,7 +850,7 @@ async fn set_visibility(page: &Page, visibility: &str, human: &mut HumanBehavior
         .await;
 
     let options = page
-        .find_elements("div.d-options-wrapper div.d-grid-item div.custom-option")
+        .find_elements(Selector::VisibilityOption.css())
         .await
         .unwrap_or_default();
 
@@ -863,7 +871,7 @@ async fn set_visibility(page: &Page, visibility: &str, human: &mut HumanBehavior
 
 async fn set_original(page: &Page, human: &mut HumanBehavior) -> Result<()> {
     let cards = page
-        .find_elements("div.custom-switch-card")
+        .find_elements(Selector::OriginalSwitchCard.css())
         .await
         .unwrap_or_default();
 
@@ -874,7 +882,7 @@ async fn set_original(page: &Page, human: &mut HumanBehavior) -> Result<()> {
         }
 
         let switch_el = card
-            .find_element("div.d-switch")
+            .find_element(Selector::OriginalSwitch.css())
             .await
             .map_err(|_| anyhow!("{}", t!("publish.original_switch_not_found")))?;
 
@@ -971,7 +979,7 @@ async fn click_explore_page_publish_button(
     let count_before = pages_before.len();
 
     let btn = page
-        .find_element(".main-container .channel-list-content > li:nth-child(3)")
+        .find_element(Selector::ExplorePagePublishBtn.css())
         .await
         .map_err(|e| {
             anyhow!(
@@ -1023,7 +1031,7 @@ async fn click_action_button(
         Duration::from_millis(500),
         || async {
             let buttons = page
-                .find_elements(".publish-page-publish-btn > button")
+                .find_elements(Selector::ActionButton.css())
                 .await
                 .unwrap_or_default();
 
