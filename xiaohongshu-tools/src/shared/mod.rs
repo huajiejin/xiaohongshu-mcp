@@ -1,3 +1,4 @@
+pub mod file_input;
 pub mod i18n;
 pub mod output;
 pub mod parse;

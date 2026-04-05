@@ -214,6 +214,9 @@ enum PublishCommands {
         #[arg(long)]
         video: String,
 
+        #[arg(long)]
+        cover: Option<String>,
+
         #[arg(long, value_delimiter = ',')]
         tags: Vec<String>,
 
@@ -326,7 +329,20 @@ fn build_command() -> clap::Command {
                     .mut_arg("is_original", |a| a.help(i18n::cli_publish_original_help()))
                     .mut_arg("draft", |a| a.help(i18n::cli_publish_draft_help()))
             })
-            .mut_subcommand("video", |s| s.about(i18n::cli_publish_video_about()))
+            .mut_subcommand("video", |s| {
+                s.about(i18n::cli_publish_video_about())
+                    .mut_arg("title", |a| a.help(i18n::cli_publish_title_help()))
+                    .mut_arg("content", |a| a.help(i18n::cli_publish_content_help()))
+                    .mut_arg("video", |a| a.help(i18n::cli_publish_video_help()))
+                    .mut_arg("cover", |a| a.help(i18n::cli_publish_cover_help()))
+                    .mut_arg("tags", |a| a.help(i18n::cli_publish_tags_help()))
+                    .mut_arg("schedule", |a| a.help(i18n::cli_publish_schedule_help()))
+                    .mut_arg("visibility", |a| {
+                        a.help(i18n::cli_publish_visibility_help())
+                    })
+                    .mut_arg("is_original", |a| a.help(i18n::cli_publish_original_help()))
+                    .mut_arg("draft", |a| a.help(i18n::cli_publish_draft_help()))
+            })
     })
 }
 
@@ -627,7 +643,34 @@ async fn run_command(
                 .await?;
                 out.result(&result);
             }
-            PublishCommands::Video { .. } => todo!(),
+            PublishCommands::Video {
+                title,
+                content,
+                video,
+                cover,
+                tags,
+                schedule,
+                visibility,
+                is_original,
+                draft,
+            } => {
+                let result = publish::run_video(
+                    &publish::PublishVideoOptions {
+                        title,
+                        content,
+                        video,
+                        cover,
+                        tags,
+                        schedule,
+                        visibility,
+                        is_original,
+                        draft,
+                    },
+                    opts,
+                )
+                .await?;
+                out.result(&result);
+            }
         },
     }
 

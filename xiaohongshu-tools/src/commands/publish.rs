@@ -1,5 +1,6 @@
 use crate::browser::human::HumanBehavior;
 use crate::browser::{self, BrowserOptions};
+use crate::shared::file_input::wait_for_file_inputs;
 use crate::shared::utils::poll_until;
 use crate::t;
 use anyhow::{Result, anyhow, bail};
@@ -38,7 +39,10 @@ pub struct PublishResult {
     pub action: String,
     pub success: bool,
     pub title: String,
-    pub image_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video: Option<bool>,
     pub scheduled_at: Option<String>,
     pub visibility: String,
     pub is_original: bool,
@@ -48,16 +52,25 @@ pub struct PublishResult {
 impl fmt::Display for PublishResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let action = if self.is_draft { "draft" } else { "publish" };
-        writeln!(
-            f,
-            "{}",
-            t!(
-                "publish.done",
-                action = action,
-                title = &self.title,
-                image_count = self.image_count,
-            )
-        )?;
+        if self.video == Some(true) {
+            writeln!(
+                f,
+                "{}",
+                t!("publish.done_video", action = action, title = &self.title,)
+            )?;
+        } else {
+            let image_count = self.image_count.unwrap_or(0);
+            writeln!(
+                f,
+                "{}",
+                t!(
+                    "publish.done",
+                    action = action,
+                    title = &self.title,
+                    image_count = image_count,
+                )
+            )?;
+        }
         if let Some(ref scheduled) = self.scheduled_at {
             writeln!(
                 f,
@@ -120,12 +133,308 @@ pub async fn run(
         action: action.to_string(),
         success: true,
         title: opts.title.clone(),
-        image_count: opts.images.len(),
+        image_count: Some(opts.images.len()),
+        video: None,
         scheduled_at: opts.schedule.clone(),
         visibility: opts.visibility.clone(),
         is_original: opts.is_original,
         is_draft: opts.draft,
     })
+}
+
+const VIDEO_UPLOAD_TIMEOUT_SECS: u64 = 300;
+
+pub struct PublishVideoOptions {
+    pub title: String,
+    pub content: String,
+    pub video: String,
+    pub cover: Option<String>,
+    pub tags: Vec<String>,
+    pub schedule: Option<String>,
+    pub visibility: String,
+    pub is_original: bool,
+    pub draft: bool,
+}
+
+pub async fn run_video(
+    opts: &PublishVideoOptions,
+    browser_opts: &BrowserOptions,
+) -> Result<PublishResult> {
+    validate_video_inputs(opts)?;
+
+    let action = if opts.draft { "draft" } else { "publish" };
+    debug!("{action} video: title={}", opts.title);
+
+    let browser = browser::create_browser(browser_opts).await?;
+    let page = browser::create_page_with_cookies(&browser, XHS_URL, &browser_opts.profile).await?;
+
+    let mut human = HumanBehavior::new();
+
+    let creator_page = click_explore_page_publish_button(&browser, &page, &mut human).await?;
+
+    wait_creator_page(&creator_page).await?;
+
+    click_publish_tab(&creator_page, "上传视频", &mut human).await?;
+    human.random_delay(human.config.human_delay.clone()).await;
+
+    upload_video(&creator_page, &opts.video, &mut human).await?;
+
+    if let Some(ref cover) = opts.cover {
+        upload_cover(&creator_page, cover, &mut human).await?;
+    }
+
+    fill_title(&creator_page, &opts.title, &mut human).await?;
+    fill_content(&creator_page, &opts.content, &opts.tags, &mut human).await?;
+
+    if opts.is_original {
+        set_original(&creator_page, &mut human).await?;
+    }
+
+    set_visibility(&creator_page, &opts.visibility, &mut human).await?;
+
+    if let Some(ref schedule) = opts.schedule {
+        set_schedule(&creator_page, schedule, &mut human).await?;
+    }
+
+    let btn_text = if opts.draft {
+        "暂存离开"
+    } else if opts.schedule.is_some() {
+        "定时发布"
+    } else {
+        "发布"
+    };
+    click_action_button(&creator_page, btn_text, &mut human).await?;
+
+    human.random_delay(human.config.read_time.clone()).await;
+
+    Ok(PublishResult {
+        action: action.to_string(),
+        success: true,
+        title: opts.title.clone(),
+        image_count: None,
+        video: Some(true),
+        scheduled_at: opts.schedule.clone(),
+        visibility: opts.visibility.clone(),
+        is_original: opts.is_original,
+        is_draft: opts.draft,
+    })
+}
+
+fn validate_video_inputs(opts: &PublishVideoOptions) -> Result<()> {
+    if opts.title.is_empty() {
+        bail!("{}", t!("publish.title_empty"));
+    }
+
+    let utf16_len = calc_utf16_title_len(&opts.title);
+    if utf16_len > TITLE_MAX_UTF16_LEN {
+        bail!(
+            "{}",
+            t!(
+                "publish.title_too_long",
+                current = utf16_len,
+                max = TITLE_MAX_UTF16_LEN,
+            )
+        );
+    }
+
+    if opts.video.is_empty() {
+        bail!("{}", t!("publish.video_empty"));
+    }
+
+    if !Path::new(&opts.video).exists() {
+        bail!("{}", t!("publish.video_not_found", path = &opts.video));
+    }
+
+    if let Some(ref cover) = opts.cover
+        && !Path::new(cover).exists()
+    {
+        bail!("{}", t!("publish.cover_not_found", path = cover));
+    }
+
+    if let Some(ref schedule) = opts.schedule {
+        let dt = chrono::NaiveDateTime::parse_from_str(schedule, "%Y-%m-%dT%H:%M")
+            .or_else(|_| chrono::NaiveDateTime::parse_from_str(schedule, "%Y-%m-%d %H:%M"))
+            .map_err(|_| anyhow!("{}", t!("publish.invalid_schedule")))?;
+
+        let scheduled = dt.and_utc();
+        let min = chrono::Utc::now() + chrono::Duration::hours(1);
+        let max = chrono::Utc::now() + chrono::Duration::days(14);
+
+        if scheduled < min {
+            bail!("{}", t!("publish.schedule_too_soon"));
+        }
+        if scheduled > max {
+            bail!("{}", t!("publish.schedule_too_far"));
+        }
+    }
+
+    Ok(())
+}
+
+async fn upload_video(page: &Page, video_path: &str, human: &mut HumanBehavior) -> Result<()> {
+    let file_inputs = wait_for_file_inputs(page, 10, |inputs| !inputs.videos.is_empty())
+        .await
+        .map_err(|e| {
+            anyhow!(
+                "{}",
+                t!("publish.upload_input_not_found", error = e.to_string())
+            )
+        })?;
+
+    let file_input = file_inputs
+        .videos
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("no video file input found on page"))?;
+
+    let node_id = file_input
+        .description()
+        .await
+        .map(|d| d.node_id)
+        .map_err(|e| anyhow!("{}", t!("publish.upload_node_error", error = e.to_string())))?;
+
+    let params = SetFileInputFilesParams::builder()
+        .files(vec![video_path.to_string()])
+        .node_id(node_id)
+        .build()
+        .map_err(|e| anyhow!("SetFileInputFiles build: {e}"))?;
+
+    page.execute(params).await?;
+
+    debug!("video upload started: {video_path}");
+
+    poll_until(
+        Duration::from_secs(VIDEO_UPLOAD_TIMEOUT_SECS),
+        Duration::from_secs(2),
+        || async {
+            let js = r#"(() => {
+                const progress = document.querySelector('.video-upload-progress');
+                if (progress) {
+                    const text = progress.textContent || '';
+                    if (text.includes('100%') || text.includes('上传完成') || text.includes('Upload complete')) {
+                        return 'done';
+                    }
+                    return text;
+                }
+                const preview = document.querySelector('.video-preview, .upload-done, .player-wrapper');
+                if (preview) return 'done';
+                return 'uploading';
+            })()"#;
+            let result = page
+                .evaluate_expression(js)
+                .await
+                .ok()
+                .and_then(|v| v.into_value::<String>().ok())
+                .unwrap_or_default();
+            if result == "done" {
+                Some(())
+            } else {
+                debug!("video upload progress: {result}");
+                None
+            }
+        },
+    )
+    .await
+    .map_err(|_| {
+        anyhow!(
+            "{}",
+            t!("publish.video_upload_timeout", timeout = VIDEO_UPLOAD_TIMEOUT_SECS)
+        )
+    })?;
+
+    human.random_delay(human.config.human_delay.clone()).await;
+    debug!("video uploaded successfully");
+    Ok(())
+}
+
+async fn upload_cover(page: &Page, cover_path: &str, human: &mut HumanBehavior) -> Result<()> {
+    let cover_el = poll_until(
+        Duration::from_secs(10),
+        Duration::from_millis(500),
+        || async {
+            page.find_element("div.publish-page-content-cover-content div.cover > div.default")
+                .await
+                .ok()
+        },
+    )
+    .await
+    .map_err(|_| anyhow!("{}", t!("publish.cover_modal_not_found")))?;
+
+    human.human_click(page, &cover_el).await?;
+    debug!("cover edit modal opened");
+    human.random_delay(human.config.human_delay.clone()).await;
+
+    let file_inputs = wait_for_file_inputs(page, 10, |inputs| !inputs.images.is_empty())
+        .await
+        .map_err(|e| {
+            anyhow!(
+                "{}",
+                t!("publish.upload_input_not_found", error = e.to_string())
+            )
+        })?;
+
+    let file_input = file_inputs
+        .images
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("no image file input found for cover upload"))?;
+
+    let node_id = file_input
+        .description()
+        .await
+        .map(|d| d.node_id)
+        .map_err(|e| anyhow!("{}", t!("publish.upload_node_error", error = e.to_string())))?;
+
+    let params = SetFileInputFilesParams::builder()
+        .files(vec![cover_path.to_string()])
+        .node_id(node_id)
+        .build()
+        .map_err(|e| anyhow!("SetFileInputFiles build: {e}"))?;
+
+    page.execute(params).await?;
+    debug!("cover file set: {cover_path}");
+
+    human
+        .random_delay(Duration::from_millis(800)..Duration::from_millis(1200))
+        .await;
+
+    let confirm_btn = poll_until(
+        Duration::from_secs(10),
+        Duration::from_millis(500),
+        || async {
+            let buttons = page
+                .find_elements("#mojito-btn-container button")
+                .await
+                .unwrap_or_default();
+            for btn in buttons {
+                let text = btn.inner_text().await.ok().flatten().unwrap_or_default();
+                if text.trim() == "确定" {
+                    return Some(btn);
+                }
+            }
+            None
+        },
+    )
+    .await
+    .map_err(|_| anyhow!("{}", t!("publish.cover_confirm_not_found")))?;
+
+    human.human_click(page, &confirm_btn).await?;
+    debug!("cover confirm clicked");
+
+    poll_until(
+        Duration::from_secs(10),
+        Duration::from_millis(500),
+        || async {
+            let modal_visible = page.find_element("div.d-modal-mask").await.is_ok();
+            if modal_visible { None } else { Some(()) }
+        },
+    )
+    .await
+    .map_err(|_| anyhow!("{}", t!("publish.cover_upload_timeout")))?;
+
+    human.random_delay(human.config.human_delay.clone()).await;
+    debug!("cover uploaded successfully");
+    Ok(())
 }
 
 fn validate_inputs(opts: &PublishNormalOptions) -> Result<()> {
@@ -259,18 +568,20 @@ async fn upload_images(page: &Page, images: &[String], human: &mut HumanBehavior
     }
 
     for (i, path) in valid_paths.iter().enumerate() {
-        let selector = if i == 0 {
-            ".upload-input"
-        } else {
-            r#"input[type="file"]"#
-        };
+        let file_inputs = wait_for_file_inputs(page, 10, |inputs| !inputs.images.is_empty())
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "{}",
+                    t!("publish.upload_input_not_found", error = e.to_string())
+                )
+            })?;
 
-        let file_input = page.find_element(selector).await.map_err(|e| {
-            anyhow!(
-                "{}",
-                t!("publish.upload_input_not_found", error = e.to_string())
-            )
-        })?;
+        let file_input = file_inputs
+            .images
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("no image file input found on page"))?;
 
         let node_id = file_input
             .description()

@@ -167,3 +167,9 @@ pub fn cli_publish_original_help() -> String {
 pub fn cli_publish_draft_help() -> String {
     t!("cli.publish_draft_help").to_string()
 }
+pub fn cli_publish_video_help() -> String {
+    t!("cli.publish_video_help").to_string()
+}
+pub fn cli_publish_cover_help() -> String {
+    t!("cli.publish_cover_help").to_string()
+}
