@@ -29,3 +29,7 @@ CLI for browsing Xiaohongshu (小红书) with simulated human behavior.
 | `--scroll-speed` | slow, normal (default), fast |
 
 Press Ctrl+C to interrupt any running command.
+
+## Run integration test
+
+`cargo build --bin xhs && cargo test xhs_cli_integration -- --ignored`
