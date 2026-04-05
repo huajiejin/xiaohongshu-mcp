@@ -1,6 +1,8 @@
 use crate::t;
 use anyhow::Result;
-use chromiumoxide::cdp::browser_protocol::input::InsertTextParams;
+use chromiumoxide::cdp::browser_protocol::input::{
+    DispatchKeyEventParams, DispatchKeyEventType, InsertTextParams,
+};
 use chromiumoxide::element::Element;
 use chromiumoxide::page::Page;
 use rand::rngs::StdRng;
@@ -60,6 +62,31 @@ impl ScrollSpeed {
             Self::Slow => 3..6,
             Self::Normal => 2..4,
             Self::Fast => 1..3,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Key {
+    Enter,
+    Backspace,
+    Space,
+    ArrowLeft,
+    ArrowRight,
+    ArrowUp,
+    ArrowDown,
+}
+
+impl Key {
+    const fn params(self) -> (&'static str, &'static str, u32) {
+        match self {
+            Self::Enter => ("Enter", "Enter", 13),
+            Self::Backspace => ("Backspace", "Backspace", 8),
+            Self::Space => (" ", "Space", 32),
+            Self::ArrowLeft => ("ArrowLeft", "ArrowLeft", 37),
+            Self::ArrowRight => ("ArrowRight", "ArrowRight", 39),
+            Self::ArrowUp => ("ArrowUp", "ArrowUp", 38),
+            Self::ArrowDown => ("ArrowDown", "ArrowDown", 40),
         }
     }
 }
@@ -182,12 +209,18 @@ impl HumanBehavior {
         self.random_delay(self.config.reaction_time.clone()).await;
 
         let point = element.clickable_point().await?;
-        page.move_mouse(point).await?;
-        self.random_delay(self.config.hover_time.clone()).await;
 
-        element.click().await?;
+        if point.x >= 0.0 && point.y >= 0.0 {
+            page.move_mouse(point).await?;
+            self.random_delay(self.config.hover_time.clone()).await;
+            element.click().await?;
+        } else {
+            element
+                .call_js_fn("function() { this.click(); }", false)
+                .await?;
+        }
+
         self.random_delay(self.config.read_time.clone()).await;
-
         Ok(())
     }
 
@@ -255,6 +288,92 @@ impl HumanBehavior {
         let base = self.config.read_time.start.as_millis() as u64;
         let extra = (content_length as u64 / 100).min(2000);
         tokio::time::sleep(Duration::from_millis(base + extra)).await;
+    }
+
+    pub async fn clear_and_input(
+        &mut self,
+        page: &Page,
+        element: &Element,
+        new_content: Option<&str>,
+    ) -> Result<()> {
+        self.human_click(page, element).await?;
+
+        let current_len: usize = element
+            .call_js_fn(
+                "function(){return(this.value||this.innerText||'').length}",
+                false,
+            )
+            .await
+            .ok()
+            .and_then(|r| r.result.value)
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize;
+
+        page.execute(InsertTextParams::new(" ")).await?;
+        self.random_delay(Duration::from_millis(30)..Duration::from_millis(60))
+            .await;
+
+        Self::press_key(page, Key::ArrowLeft).await?;
+        self.random_delay(Duration::from_millis(30)..Duration::from_millis(60))
+            .await;
+
+        let extra_backspaces = current_len + self.rng.random_range(5..10);
+        for _ in 0..extra_backspaces {
+            Self::press_key(page, Key::Backspace).await?;
+            self.random_delay(Duration::from_millis(20)..Duration::from_millis(60))
+                .await;
+        }
+
+        if let Some(content) = new_content
+            && !content.is_empty()
+        {
+            page.execute(InsertTextParams::new(content)).await?;
+            self.random_delay(Duration::from_millis(30)..Duration::from_millis(60))
+                .await;
+        }
+
+        Self::press_key(page, Key::ArrowRight).await?;
+        self.random_delay(Duration::from_millis(30)..Duration::from_millis(60))
+            .await;
+
+        let has_trailing_space: bool = element
+            .call_js_fn("function(){let v=this.value||this.innerText||'';return v.length>0&&v.endsWith(' ')}", false)
+            .await
+            .ok()
+            .and_then(|r| r.result.value)
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        if has_trailing_space {
+            Self::press_key(page, Key::Backspace).await?;
+        }
+
+        Self::press_key(page, Key::Enter).await?;
+        self.random_delay(self.config.read_time.clone()).await;
+        Ok(())
+    }
+
+    pub async fn press_key(page: &Page, key: Key) -> Result<()> {
+        let (key_name, code, vk) = key.params();
+        let down = DispatchKeyEventParams::builder()
+            .r#type(DispatchKeyEventType::KeyDown)
+            .key(key_name)
+            .code(code)
+            .windows_virtual_key_code(vk)
+            .build()
+            .map_err(|e| anyhow::anyhow!("DispatchKeyEvent build: {e}"))?;
+        page.execute(down).await?;
+
+        let up = DispatchKeyEventParams::builder()
+            .r#type(DispatchKeyEventType::KeyUp)
+            .key(key_name)
+            .code(code)
+            .windows_virtual_key_code(vk)
+            .build()
+            .map_err(|e| anyhow::anyhow!("DispatchKeyEvent build: {e}"))?;
+        page.execute(up).await?;
+
+        Ok(())
     }
 
     pub async fn scroll_container(&mut self, page: &Page, selectors: &[&str]) -> Result<()> {

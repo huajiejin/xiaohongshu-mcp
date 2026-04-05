@@ -7,7 +7,7 @@ use xiaohongshu_tools::auth;
 use xiaohongshu_tools::browser::BrowserOptions;
 use xiaohongshu_tools::browser::human::ScrollSpeed;
 use xiaohongshu_tools::browser::{create_browser, create_page_with_cookies};
-use xiaohongshu_tools::commands::{comment, creator, explore, like, note, search};
+use xiaohongshu_tools::commands::{comment, creator, explore, like, note, publish, search};
 use xiaohongshu_tools::shared::i18n;
 use xiaohongshu_tools::shared::output::{Format, Output};
 
@@ -163,6 +163,11 @@ enum Commands {
         #[arg(long, default_value = "normal")]
         scroll_speed: String,
     },
+
+    Publish {
+        #[command(subcommand)]
+        command: PublishCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -170,6 +175,60 @@ enum AuthCommands {
     Login,
     Logout,
     Status,
+}
+
+#[derive(Subcommand)]
+enum PublishCommands {
+    Normal {
+        #[arg(long)]
+        title: String,
+
+        #[arg(long)]
+        content: String,
+
+        #[arg(long, value_delimiter = ',')]
+        images: Vec<String>,
+
+        #[arg(long, value_delimiter = ',')]
+        tags: Vec<String>,
+
+        #[arg(long)]
+        schedule: Option<String>,
+
+        #[arg(long, default_value = "public")]
+        visibility: String,
+
+        #[arg(long)]
+        is_original: bool,
+
+        #[arg(long)]
+        draft: bool,
+    },
+    Video {
+        #[arg(long)]
+        title: String,
+
+        #[arg(long)]
+        content: String,
+
+        #[arg(long)]
+        video: String,
+
+        #[arg(long, value_delimiter = ',')]
+        tags: Vec<String>,
+
+        #[arg(long)]
+        schedule: Option<String>,
+
+        #[arg(long, default_value = "public")]
+        visibility: String,
+
+        #[arg(long)]
+        is_original: bool,
+
+        #[arg(long)]
+        draft: bool,
+    },
 }
 
 fn build_command() -> clap::Command {
@@ -251,6 +310,23 @@ fn build_command() -> clap::Command {
             .mut_arg("text", |a| a.help(i18n::cli_comment_text_help()))
             .mut_arg("comment_id", |a| a.help(i18n::cli_comment_id_help()))
             .mut_arg("scroll_speed", |a| a.help(i18n::cli_scroll_speed_help()))
+    })
+    .mut_subcommand("publish", |s| {
+        s.about(i18n::cli_publish_about())
+            .mut_subcommand("normal", |s| {
+                s.about(i18n::cli_publish_normal_about())
+                    .mut_arg("title", |a| a.help(i18n::cli_publish_title_help()))
+                    .mut_arg("content", |a| a.help(i18n::cli_publish_content_help()))
+                    .mut_arg("images", |a| a.help(i18n::cli_publish_images_help()))
+                    .mut_arg("tags", |a| a.help(i18n::cli_publish_tags_help()))
+                    .mut_arg("schedule", |a| a.help(i18n::cli_publish_schedule_help()))
+                    .mut_arg("visibility", |a| {
+                        a.help(i18n::cli_publish_visibility_help())
+                    })
+                    .mut_arg("is_original", |a| a.help(i18n::cli_publish_original_help()))
+                    .mut_arg("draft", |a| a.help(i18n::cli_publish_draft_help()))
+            })
+            .mut_subcommand("video", |s| s.about(i18n::cli_publish_video_about()))
     })
 }
 
@@ -524,6 +600,35 @@ async fn run_command(
             .await?;
             out.result(&result);
         }
+        Commands::Publish { command } => match command {
+            PublishCommands::Normal {
+                title,
+                content,
+                images,
+                tags,
+                schedule,
+                visibility,
+                is_original,
+                draft,
+            } => {
+                let result = publish::run(
+                    &publish::PublishNormalOptions {
+                        title,
+                        content,
+                        images,
+                        tags,
+                        schedule,
+                        visibility,
+                        is_original,
+                        draft,
+                    },
+                    opts,
+                )
+                .await?;
+                out.result(&result);
+            }
+            PublishCommands::Video { .. } => todo!(),
+        },
     }
 
     Ok(())

@@ -134,3 +134,36 @@ pub fn cli_comment_text_help() -> String {
 pub fn cli_comment_id_help() -> String {
     t!("cli.comment_id_help").to_string()
 }
+pub fn cli_publish_about() -> String {
+    t!("cli.publish_about").to_string()
+}
+pub fn cli_publish_normal_about() -> String {
+    t!("cli.publish_normal_about").to_string()
+}
+pub fn cli_publish_video_about() -> String {
+    t!("cli.publish_video_about").to_string()
+}
+pub fn cli_publish_title_help() -> String {
+    t!("cli.publish_title_help").to_string()
+}
+pub fn cli_publish_content_help() -> String {
+    t!("cli.publish_content_help").to_string()
+}
+pub fn cli_publish_images_help() -> String {
+    t!("cli.publish_images_help").to_string()
+}
+pub fn cli_publish_tags_help() -> String {
+    t!("cli.publish_tags_help").to_string()
+}
+pub fn cli_publish_schedule_help() -> String {
+    t!("cli.publish_schedule_help").to_string()
+}
+pub fn cli_publish_visibility_help() -> String {
+    t!("cli.publish_visibility_help").to_string()
+}
+pub fn cli_publish_original_help() -> String {
+    t!("cli.publish_original_help").to_string()
+}
+pub fn cli_publish_draft_help() -> String {
+    t!("cli.publish_draft_help").to_string()
+}

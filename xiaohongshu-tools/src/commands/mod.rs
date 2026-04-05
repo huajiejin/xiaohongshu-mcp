@@ -4,5 +4,6 @@ pub mod explore;
 pub mod interact;
 pub mod like;
 pub mod note;
+pub mod publish;
 pub mod search;
 pub mod support;
